@@ -32,12 +32,7 @@ class Sensor(GeometricNode):
     def distance_from(self, sensor):
         return self.location.distance(sensor.location)
 
-    def hop_random(self):
-        radius = self.interest_area.radius * random.random()
-        argument = 2 * math.pi * random.random()
-        self.location = self.get_location(radius=radius, argument=argument)
-
-    def get_location(self, radius=None, argument=None):
+    def get_location(self, radius, argument):
         assert 0 <= radius <= self.interest_area.radius
         self._r = radius
         self._argument = argument
@@ -74,8 +69,19 @@ class AdHocSensorNetwork(object):
             return False
 
         sensor = self.graph.nodes[sensor_id]
-        sensor.hop_random()
+        self.hop_random(sensor=sensor)
         self.graph.construct_edges(node=sensor)
+
+    def hop_random(self, sensor):
+        '''
+        Moves a sensor to a random location inside its interest_area
+        Note: This miethod is not under the Sensor class for a reason!
+        :param sensor: the sensor to be moved
+        :return:
+        '''
+        radius = sensor.interest_area.radius * random.random()
+        argument = 2 * math.pi * random.random()
+        sensor.location = sensor.get_location(radius=radius, argument=argument)
 
     def plot(self, fig_id, xlims, ylims):
         plt.figure(fig_id)

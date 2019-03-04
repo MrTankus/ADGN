@@ -6,11 +6,8 @@ name = "pypi"
 [dev-packages]
 
 [packages]
-matplotlib = "==3.0.2"
 numpy = "==1.15.4"
-pandas = "==0.23.4"
-networkx = "==2.2"
-scipy = "==1.1.0"
+matplotlib = "==3.0.2"
 
 [requires]
 python_version = "3.7"
