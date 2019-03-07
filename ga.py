@@ -1,10 +1,11 @@
 import datetime
 import copy
 import random
+
 import matplotlib
 matplotlib.use('TkAgg')
-
 import matplotlib.pyplot as plt
+
 from collections import defaultdict
 from network import AdHocSensorNetwork
 
@@ -53,14 +54,13 @@ class GAStatistics(object):
 
 class GA(object):
 
-    def __init__(self, interest_areas, initial_population_size, generations, fitness_function, mutation_factor=0.2, death_factor=0.2):
+    def __init__(self, interest_areas, initial_population_size, generations, fitness_function, mutation_factor=0.2):
         self.interest_areas = interest_areas
         self.initial_population_size = initial_population_size
         self.fitness_function = fitness_function
         self.agents = self.generate_initial_population(fitness_function=self.fitness_function)
         self.generations = generations
         self.mutation_factor = mutation_factor
-        self.death_factor = death_factor
         self.statistics = GAStatistics(ga=self)
 
     def generate_initial_population(self, fitness_function):
@@ -143,3 +143,7 @@ class GA(object):
             # #        if d > 1 - never mind
             # for node in smallest_component:
             #     network.move_sensor(node.node_id)
+
+    def get_fittest(self):
+        sorted_agents = sorted(self.agents, key=lambda agent: agent.fitness, reverse=True)
+        return sorted_agents[0]
