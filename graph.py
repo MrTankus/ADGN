@@ -117,6 +117,12 @@ class Graph(object):
             component_index += 1
         return self._connectivity_components
 
+    def get_connectivity_componenet(self, node):
+        for component_id in self.get_connectivity_components():
+            if node in self.get_connectivity_components()[component_id]:
+                return component_id
+        return None
+
 
 class GeometricGraph(Graph):
 

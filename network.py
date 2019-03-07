@@ -43,12 +43,16 @@ class Sensor(GeometricNode):
     def sensing_radius(self):
         return self.halo
 
+    def clone(self):
+        return Sensor(id=self.id, interest_area=self.interest_area, r=self._r, argument=self._argument,
+                      sensing_radius=self.halo)
+
 
 class AdHocSensorNetwork(object):
 
-    def __init__(self, interest_areas):
+    def __init__(self, interest_areas, nodes=None):
         self.interest_areas = interest_areas
-        self.graph = UDG()
+        self.graph = UDG(nodes=nodes)
 
     def randomize(self):
         sensor_id = 0

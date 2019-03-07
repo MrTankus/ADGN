@@ -121,6 +121,9 @@ class Circle(object):
     def __hash__(self):
         return hash((self.center, self.radius))
 
+    def is_in_circle(self, point):
+        return self.center.distance(point=point) <= self.radius
+
     def intersects(self, circle):
         return self.center.distance(circle.center) < (self.radius + circle.radius)
 
