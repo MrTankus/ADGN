@@ -1,5 +1,4 @@
-import queue
-from collections import defaultdict
+from collections import defaultdict, deque
 
 
 class Node(object):
@@ -50,17 +49,17 @@ class Graph(object):
         self.edges = edges or set()
         self._neighbors = defaultdict(set)
         self._connectivity_components = defaultdict(set)
+        self._connectivity_components_node_mapping = dict()
 
     def add_node(self, node):
         self.nodes[node.node_id] = node
-        self._connectivity_components.clear()
 
     def remove_node(self, node):
         edges_to_remove = filter(lambda edge: edge.is_on_edge(node=node), self.edges)
         for edge in edges_to_remove:
             self.remove_edge(edge=edge)
         self.nodes.pop(node.node_id)
-        self._connectivity_components.clear()
+        self.invalidate_connectivity_component(node=node)
 
     def get_node(self, node_id):
         return self.nodes[node_id]
@@ -71,14 +70,17 @@ class Graph(object):
         self.edges.add(Edge(node1=node1, node2=node2))
         self._neighbors[node1.node_id].add(node2)
         self._neighbors[node2.node_id].add(node1)
-        self._connectivity_components.clear()
+
+        self.invalidate_connectivity_component(node=node1)
+        self.invalidate_connectivity_component(node=node2)
 
     def remove_edge(self, edge):
         assert edge in self.edges
         self.edges.remove(edge)
         self._neighbors[edge.node1.node_id].remove(edge.node2)
         self._neighbors[edge.node2.node_id].remove(edge.node1)
-        self._connectivity_components.clear()
+        self.invalidate_connectivity_component(node=edge.node1)
+        self.invalidate_connectivity_component(node=edge.node2)
 
     def get_neighbors(self, node):
         assert node.node_id in self.nodes
@@ -96,32 +98,47 @@ class Graph(object):
         return len(self.get_connectivity_components()) == 1
 
     def get_connectivity_components(self):
-        if self._connectivity_components:
-            return self._connectivity_components
-        all_nodes = set(map(lambda item: item[1], self.nodes.items()))
+        all_nodes = map(lambda item: item[1], self.nodes.items())
         visited_nodes = set()
         component_index = 0
         for node in all_nodes:
             if node in visited_nodes:
                 continue
-            q = queue.Queue(maxsize=len(self.nodes))
-            q.put(node)
-            while q.qsize() > 0:
-                n = q.get()
-                self._connectivity_components[component_index].add(n)
-                visited_nodes.add(n)
-                relevant_edges = list(filter(lambda e: e.is_on_edge(node=n), self.edges))
-                connected_nodes = set(map(lambda e: e.node1 if e.node1 is not n else e.node2, relevant_edges))
-                for connected_node in connected_nodes.difference(visited_nodes):
-                    q.put(connected_node)
+            if self._connectivity_components_node_mapping.get(node.node_id):
+                continue
+            connectivity_component = self.get_connectivity_component(node=node)
+            for n in connectivity_component:
+                self._connectivity_components_node_mapping[n.node_id] = component_index
+            self._connectivity_components[component_index].add(connectivity_component)
             component_index += 1
+            visited_nodes.update(connectivity_component)
         return self._connectivity_components
 
-    def get_connectivity_componenet(self, node):
-        for component_id in self.get_connectivity_components():
-            if node in self.get_connectivity_components()[component_id]:
-                return component_id
-        return None
+    def get_connectivity_component(self, node):
+        if self._connectivity_components_node_mapping.get(node.node_id):
+            return self._connectivity_components_node_mapping.get(node.node_id)
+        q = deque([], maxlen=len(self.nodes))
+        connectivity_component = set()
+        visited_nodes = set()
+        q.append(node)
+        while len(q) > 0:
+            n = q.popleft()
+            connectivity_component.add(n)
+            visited_nodes.add(n)
+            connected_nodes = self.get_neighbors(node=n) - visited_nodes
+            for connected_node in connected_nodes:
+                q.append(connected_node)
+        return frozenset(connectivity_component)
+
+    def invalidate_connectivity_component(self, node):
+        connectivity_component_index = self._connectivity_components_node_mapping.get(node.node_id)
+        if connectivity_component_index:
+            self._connectivity_components.pop(connectivity_component_index)
+            relevant_nodes_ids = map(lambda item: item[0],
+                                     filter(lambda item: item[1] == connectivity_component_index,
+                                            self._connectivity_components_node_mapping.items()))
+            for node_id in set(relevant_nodes_ids):
+                self._connectivity_components_node_mapping.pop(node_id)
 
 
 class GeometricGraph(Graph):

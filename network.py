@@ -51,7 +51,7 @@ class Sensor(GeometricNode):
 class AdHocSensorNetwork(object):
 
     def __init__(self, interest_areas, nodes=None):
-        self.interest_areas = interest_areas
+        self.interest_areas = set(interest_areas)
         self.graph = UDG(nodes=nodes)
 
     def randomize(self):
@@ -87,7 +87,7 @@ class AdHocSensorNetwork(object):
         argument = 2 * math.pi * random.random()
         sensor.location = sensor.get_location(radius=radius, argument=argument)
 
-    def plot(self, fig_id, xlims, ylims):
+    def plot(self, fig_id, title, xlims, ylims):
         plt.figure(fig_id)
         ax = plt.gca()
         for ia in self.interest_areas:
@@ -113,4 +113,5 @@ class AdHocSensorNetwork(object):
         ax.set_title('Adhoc Network')
         plt.xlim(xlims[0], xlims[1])
         plt.ylim(ylims[0], ylims[1])
+        plt.title(title)
         plt.show()
