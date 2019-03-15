@@ -1,3 +1,4 @@
+import itertools
 import numbers
 import math
 import numpy as np
@@ -34,6 +35,9 @@ class Point(object):
 
     def as_list(self):
         return [self.x, self.y]
+
+    def clone(self):
+        return Point(x=self.x, y=self.y)
 
 
 class LineSegment(object):
@@ -146,17 +150,11 @@ class Circle(object):
 
     @classmethod
     def get_point_in_intersection(cls, circles):
-        couples = []
-        circles_list = list(circles)
+        circles_pairs = itertools.combinations(circles, 2)
         all_intersection_points = set()
-        for i in range(len(circles_list)):
-            for j in range(i + 1, len(circles_list)):
-                couples.append((circles_list[i], circles_list[j]))
 
         lines = []
-        for couple in couples:
-            c1 = couple[0]
-            c2 = couple[1]
+        for c1, c2 in circles_pairs:
             intersection_points = c1.get_intersection_points(circle=c2)
             if intersection_points:
                 all_intersection_points.add(intersection_points[0])
@@ -167,12 +165,11 @@ class Circle(object):
             return all_intersection_points, lines[0].get_mid_point()
         else:
             points = set()
-            for l1 in lines:
-                for l2 in lines:
-                    if l1 != l2:
-                        p = l1.get_intersection_point(line_segment=l2)
-                        if p:
-                            points.add(p)
+            line_pairs = itertools.combinations(lines, 2)
+            for l1, l2 in line_pairs:
+                p = l1.get_intersection_point(line_segment=l2)
+                if p:
+                    points.add(p)
             if len(points) >= 3:
                 return all_intersection_points, (ConvexHull(points)).get_center()
 

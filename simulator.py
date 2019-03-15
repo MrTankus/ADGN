@@ -18,10 +18,14 @@ def generate_interest_areas(num_of_interest_areas, xlims, ylims, allow_overlappi
     while len(interest_areas) < num_of_interest_areas:
         ia = InterestArea(center=Point(x=(xlims[0] + 1) + (xlims[1] - 1 - xlims[0] - 1) * random.random(),
                                        y=(ylims[0] + 1) + (ylims[1] - 1 - ylims[0] - 1) * random.random()),
-                          radius=0.3 + 0.2 * random.random(), name='Omega' + str(interest_area_id))
+                          radius=0.3 + 0.2 * random.random(), name='IA-' + str(interest_area_id))
         if not allow_overlapping:
             if not any(other.intersects(ia) for other in interest_areas):
                 interest_areas.add(ia)
+                interest_area_id += 1
+        else:
+            interest_areas.add(ia)
+            interest_area_id += 1
 
     hub = random.sample(interest_areas, 1)[0]
     hub.name = 'HUB'
@@ -36,7 +40,7 @@ def edges_fitness_function(network):
 
 def largest_connectivity_componenet_fitness_function(network):
     connectivity_components = network.graph.get_connectivity_components()
-    return max(map(lambda cc_index: len(connectivity_components[cc_index]), connectivity_components)) + len(network.graph.edges)
+    return max(map(lambda cc: len(cc), connectivity_components)) + len(network.graph.edges)
 
 
 def main(*args, **kwargs):
@@ -49,11 +53,14 @@ def main(*args, **kwargs):
 
     print('Generating random interest areas')
     # interest_areas = test_interest_areas
-    interest_areas = generate_interest_areas(num_of_interest_areas=num_of_interest_areas, xlims=xlims, ylims=ylims)
+    interest_areas = generate_interest_areas(num_of_interest_areas=num_of_interest_areas, xlims=xlims, ylims=ylims,
+                                             allow_overlapping=False)
 
     # GA - will always mutate (mutation factor = 1)
     ga = GA(interest_areas=interest_areas, initial_population_size=population_size, generations=generations,
             fitness_function=largest_connectivity_componenet_fitness_function, mutation_factor=1)
+
+    ga.generate_initial_population()
 
     # Fittest member in initial population
     fittest_agent = ga.get_fittest()
@@ -79,10 +86,10 @@ def main(*args, **kwargs):
 if __name__ == '__main__':
     x_lims = (-6, 6)
     y_lims = (-6, 6)
-    amount_of_interest_areas = 100
+    amount_of_interest_areas = 50
 
     initial_population_size = 20
-    max_generations = 500
+    max_generations = 900
 
     main(initial_population_size=initial_population_size, max_generations=max_generations,
          num_of_interest_reas=amount_of_interest_areas, xlims=x_lims, ylims=y_lims)

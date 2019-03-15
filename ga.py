@@ -1,8 +1,12 @@
-import datetime
 import copy
+import datetime
+import itertools
 import random
 
 import matplotlib
+
+from geometry import Circle
+
 matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 
@@ -35,7 +39,7 @@ class GAStatistics(object):
         self.statistics = defaultdict(list)
 
     def gen_snapshot(self, gen, time_spent):
-        self.statistics[GAStatistics.GEN_FITNESS].append((gen, max([agent.fitness for agent in self.ga.agents])))
+        self.statistics[GAStatistics.GEN_FITNESS].append((gen, self.ga.get_fittest().fitness))
         self.statistics[GAStatistics.GEN_TIME].append((gen, time_spent))
 
     def plot_statistic(self, name):
@@ -54,22 +58,23 @@ class GAStatistics(object):
 
 class GA(object):
 
-    def __init__(self, interest_areas, initial_population_size, generations, fitness_function, mutation_factor=0.2):
+    def __init__(self, interest_areas, initial_population_size, generations, fitness_function, mutation_factor=0.8):
         self.interest_areas = interest_areas
         self.initial_population_size = initial_population_size
         self.fitness_function = fitness_function
-        self.agents = self.generate_initial_population(fitness_function=self.fitness_function)
+        self.agents = None
         self.generations = generations
         self.mutation_factor = mutation_factor
         self.statistics = GAStatistics(ga=self)
+        self.fittest_agent = None
 
-    def generate_initial_population(self, fitness_function):
-        agents = list()
+    def generate_initial_population(self):
+        initial_agents = list()
         for i in range(self.initial_population_size):
             network = AdHocSensorNetwork(interest_areas=self.interest_areas)
             network.randomize()
-            agents.append(Agent(network=network, fitness_function=fitness_function))
-        return agents
+            initial_agents.append(Agent(network=network, fitness_function=self.fitness_function))
+        self.agents = initial_agents
 
     def evolve(self):
         for gen in range(self.generations):
@@ -81,10 +86,14 @@ class GA(object):
             self.mutate()
             self.statistics.gen_snapshot(gen=gen, time_spent=(datetime.datetime.now() - start).total_seconds())
         self.calc_fitness()
+        print('Adding relays')
+        self.add_relays()
+        self.calc_fitness()
 
     def calc_fitness(self):
         for agent in self.agents:
             agent.calc_fitness()
+            self.fittest_agent = agent if self.fittest_agent is None or self.fittest_agent.fitness < agent.fitness else self.fittest_agent
 
     def selection(self):
         selected_agents = sorted(self.agents, key=lambda agent: agent.fitness, reverse=True)
@@ -111,10 +120,10 @@ class GA(object):
             a2_nodes = set(random.choices(all_a2_nodes, k=random.randint(0, int(len(all_a2_nodes) / 2))))
             compliment_in_a1 = set(node for node in filter(lambda n: n not in a2_nodes, all_a1_nodes))
 
-            first_born_nodes = set(map(lambda n: copy.deepcopy(n), a1_nodes.union(compliment_in_a2)))
+            first_born_nodes = set(map(lambda n: n.clone(), a1_nodes.union(compliment_in_a2)))
             first_born = AdHocSensorNetwork(interest_areas=self.interest_areas, nodes=first_born_nodes)
 
-            second_born_nodes = set(map(lambda n: copy.deepcopy(n), a2_nodes.union(compliment_in_a1)))
+            second_born_nodes = set(map(lambda n: n.clone(), a2_nodes.union(compliment_in_a1)))
             second_born = AdHocSensorNetwork(interest_areas=self.interest_areas, nodes=second_born_nodes)
             offsprings.add(Agent(network=first_born, fitness_function=self.fitness_function))
             offsprings.add(Agent(network=second_born, fitness_function=self.fitness_function))
@@ -122,28 +131,27 @@ class GA(object):
 
     def mutate(self):
         for agent in self.agents:
-            if random.random() >= self.mutation_factor:
+            if self.mutation_factor < random.random():
                 return
             network = agent.network
-            random_node = random.choice(network.graph.nodes)
+            random_node = network.get_random_sensor(include_relays=False)
             network.move_sensor(random_node.node_id)
 
-            # connectivity_components = network.graph.get_connectivity_components()
-            # smallest_component = None
-            # largest_component = None
-            # for component_id in connectivity_components:
-            #     connectivity_component = connectivity_components[component_id]
-            #     smallest_component = connectivity_component if smallest_component is None or len(smallest_component) > len(
-            #         connectivity_component) else smallest_component
-            #     largest_component = connectivity_component if largest_component is None or len(largest_component) <= len(
-            #         connectivity_component) else largest_component
-            #
-            # # TODO - check the distance (d) between connectivity components.
-            # #        if d <= 1 - try to join components
-            # #        if d > 1 - never mind
-            # for node in smallest_component:
-            #     network.move_sensor(node.node_id)
+    def add_relays(self):
+        for agent in self.agents:
+            network = agent.network
+            connectivity_component_pairs = itertools.combinations(network.graph.get_connectivity_components(), 2)
+            intersecting_connectivity_components = filter(lambda pair: network.get_connectivity_components_halos_intersections(cc1=pair[0], cc2=pair[1]), connectivity_component_pairs)
+            if intersecting_connectivity_components:
+                for cc_pair in intersecting_connectivity_components:
+                    halo_intersecting_circles = network.get_connectivity_components_halos_intersections(cc1=cc_pair[0], cc2=cc_pair[1])
+                    intersecting_circles = random.choice(list(halo_intersecting_circles))
+                    _, relay_location = Circle.get_point_in_intersection(intersecting_circles)
+                    network.add_relay(location=relay_location)
 
     def get_fittest(self):
-        sorted_agents = sorted(self.agents, key=lambda agent: agent.fitness, reverse=True)
-        return sorted_agents[0]
+        if self.fittest_agent:
+            return self.fittest_agent
+
+        self.calc_fitness()
+        return self.fittest_agent
