@@ -1,5 +1,3 @@
-import string
-
 import matplotlib
 matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
@@ -10,8 +8,9 @@ import math
 import random
 import uuid
 import hashlib
-from geometry import Point, Circle
-from graph import GeometricNode, UDG
+from geometry.shapes import Point, Circle
+from graphs.graphs import UDG
+from graphs.nodes import GeometricNode
 
 
 class InterestArea(Circle):
@@ -22,41 +21,6 @@ class InterestArea(Circle):
         self.is_hub = is_hub
 
 
-class Sensor(GeometricNode):
-
-    def __init__(self, id, interest_area, distance_from_ia_center, argument, sensing_radius):
-        assert 0 <= distance_from_ia_center <= interest_area.radius
-        self.id = id
-        self._distance_from_ia_center = distance_from_ia_center
-        self._argument = argument
-        self.interest_area = interest_area
-        super(Sensor, self).__init__(node_id=id, location=self.get_location(
-                                     distance_from_ia_center=self._distance_from_ia_center, argument=self._argument),
-                                     halo=sensing_radius)
-
-    def get_location(self, distance_from_ia_center, argument):
-        assert 0 <= distance_from_ia_center <= self.interest_area.radius
-        self._distance_from_ia_center = distance_from_ia_center
-        self._argument = argument
-        x_location = self.interest_area.center.x + self._distance_from_ia_center * math.cos(self._argument)
-        y_location = self.interest_area.center.y + self._distance_from_ia_center * math.sin(self._argument)
-        return Point(x=x_location, y=y_location)
-
-    def sensing_radius(self):
-        return self.halo
-
-    def clone(self):
-        return Sensor(id=self.id, interest_area=self.interest_area,
-                      distance_from_ia_center=self._distance_from_ia_center, argument=self._argument,
-                      sensing_radius=self.halo)
-
-
-class RelaySensor(GeometricNode):
-
-    def __init__(self, node_id, location, sensing_radius):
-        super(RelaySensor, self).__init__(node_id=node_id, location=location, halo=sensing_radius)
-
-
 class AdHocSensorNetwork(object):
 
     def __init__(self, interest_areas, nodes=None):
@@ -65,30 +29,38 @@ class AdHocSensorNetwork(object):
         self.interest_area_clusters = set()
         self.relays = set()
 
+    @staticmethod
+    def generate_random_sensor_location(interest_area, mid_center=False):
+        if mid_center:
+            return Point(x=interest_area.center.x, y=interest_area.center.y)
+        argument = 2 * math.pi * random.random()
+        r = interest_area.radius * random.random()
+        x_location = interest_area.center.x + r * math.cos(argument)
+        y_location = interest_area.center.y + r * math.sin(argument)
+        return Point(x=x_location, y=y_location)
+
     def randomize(self):
         sensor_id = 0
         for interest_area in self.interest_areas:
-            if interest_area.is_hub:
-                sensor = Sensor(id=sensor_id, interest_area=interest_area, distance_from_ia_center=0, argument=0,
-                                sensing_radius=1)
-            else:
-                argument = 2 * math.pi * random.random()
-                r = interest_area.radius * random.random()
-                sensor = Sensor(id=sensor_id, interest_area=interest_area, distance_from_ia_center=r, argument=argument,
-                                sensing_radius=1)
-            self.graph.add_node(sensor)
+            data = {
+                'interest_area': interest_area,
+                'is_relay': False
+            }
+
+            self.graph.add_node(node_id=sensor_id, data=data,
+                                location=self.generate_random_sensor_location(interest_area=interest_area,
+                                                                              mid_center=interest_area.is_hub))
             sensor_id += 1
-        self.graph.original_node_count = len(self.graph.nodes)
 
     def get_random_sensor(self, include_relays=True):
         if include_relays:
-            return random.choice(self.graph.nodes.values())
+            return random.choice(self.graph.nodes)
         else:
-            relays = list(filter(lambda sensor: isinstance(sensor, Sensor), self.graph.nodes.values()))
+            relays = list(filter(lambda sensor: sensor.get('is_relay'), self.graph.nodes.values()))
             if relays:
                 return random.choice(relays)
             else:
-                return random.choice(self.graph.nodes.values())
+                return random.choice(self.graph.nodes)
 
     def get_connectivity_component_halo(self, connectivity_component):
         return map(lambda sensor: Circle(center=sensor.location, radius=sensor.halo), connectivity_component)
@@ -116,7 +88,10 @@ class AdHocSensorNetwork(object):
 
     def add_relay(self, location, *args, **kwargs):
         random_node_id = hashlib.sha256(str(uuid.uuid4()).encode()).hexdigest()
-        self.graph.add_node(node=RelaySensor(node_id=random_node_id, location=location, sensing_radius=1), *args, **kwargs)
+        data = {
+            'is_relay': True
+        }
+        self.graph.add_node(node_id=random_node_id, data=data, location=location, *args, **kwargs)
         self.relays.add(random_node_id)
 
     def hop_random(self, sensor):
@@ -126,9 +101,7 @@ class AdHocSensorNetwork(object):
         :param sensor: the sensor to be moved
         :return:
         '''
-        radius = sensor.interest_area.radius * random.random()
-        argument = 2 * math.pi * random.random()
-        sensor.location = sensor.get_location(distance_from_ia_center=radius, argument=argument)
+        sensor.location = self.generate_random_sensor_location(interest_area=sensor.get('interest_area'))
 
     def plot(self, fig_id, title, xlims, ylims):
         plt.figure(fig_id)
@@ -146,7 +119,7 @@ class AdHocSensorNetwork(object):
         relays_ys = []
         for sensor_id in self.graph.nodes:
             sensor = self.graph.nodes[sensor_id]
-            if isinstance(sensor, RelaySensor):
+            if sensor.get(key='is_relay'):
                 relays_xs.append(sensor.location.x)
                 relays_ys.append(sensor.location.y)
             else:

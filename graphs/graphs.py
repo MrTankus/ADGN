@@ -1,63 +1,7 @@
+from graphs.edges import Edge, GeometricEdge
 from collections import defaultdict, deque
 
-
-class Node(object):
-
-    def __init__(self, node_id, data=None):
-        self.node_id = node_id
-        self.data = data
-
-    def __eq__(self, other):
-        return other.node_id == self.node_id
-
-    def __hash__(self):
-        return hash(self.node_id)
-
-    def clone(self):
-        return Node(node_id=self.node_id, data=self.data)
-
-
-class GeometricNode(Node):
-
-    def __init__(self, node_id, location, data=None, halo=None):
-        super(GeometricNode, self).__init__(node_id=node_id, data=data)
-        self.location = location
-        self.halo = halo
-
-    def distance_from(self, geometric_node, metric=None):
-        if metric and callable(metric):
-            return metric(self, geometric_node)
-        return self.location.distance(geometric_node.location)
-
-    def clone(self):
-        return GeometricNode(node_id=self.node_id, location=self.location.clone(), data=self.data, halo=self.halo)
-
-
-class Edge(object):
-
-    def __init__(self, node1, node2, cost_function=None):
-        assert cost_function is None or callable(cost_function)
-        self.node1 = node1
-        self.node2 = node2
-        self.cost_function = cost_function
-
-    def __eq__(self, other):
-        return self.is_on_edge(other.node1) and self.is_on_edge(other.node2)
-
-    def __hash__(self):
-        return hash(frozenset([self.node1, self.node2]))
-
-    def is_on_edge(self, node):
-        return self.node1 == node or self.node2 == node
-
-    def weight(self):
-        return self.cost_function(self.node1, self.node2)
-
-
-class GeometricEdge(Edge):
-
-    def length(self):
-        return self.node1.distance_from(geometric_node=self.node2)
+from graphs.nodes import Node, GeometricNode
 
 
 class Graph(object):
@@ -72,8 +16,13 @@ class Graph(object):
     def construct_edge(self, node1, node2, cost_function):
         return Edge(node1=node1, node2=node2, cost_function=cost_function)
 
-    def add_node(self, node, *args, **kwargs):
-        self.nodes[node.node_id] = node
+    def construct_node(self, node_id, data, *args, **kwargs):
+        return Node(node_id=node_id, data=data)
+
+    def add_node(self, node_id, data=None, *args, **kwargs):
+        new_node = self.construct_node(node_id=node_id, data=data, *args, **kwargs)
+        self.nodes[new_node.node_id] = new_node
+        return new_node
 
     def remove_node(self, node):
         edges_to_remove = set(filter(lambda edge: edge.is_on_edge(node=node), self.edges))
@@ -189,11 +138,15 @@ class Graph(object):
 
 class GeometricGraph(Graph):
 
-    def __init__(self, nodes=None, edges=None):
+    def __init__(self, nodes=None, edges=None, metric=None):
         super(GeometricGraph, self).__init__(nodes=nodes, edges=edges)
+        self.metric = metric
 
     def construct_edge(self, node1, node2, cost_function):
         return GeometricEdge(node1=node1, node2=node2, cost_function=cost_function)
+
+    def construct_node(self, node_id, data, *args, **kwargs):
+        return GeometricNode(node_id=node_id, data=data, location=kwargs.get('location'), halo=kwargs.get('halo'))
 
     def get_nearest_neighbors(self, node):
         neighbors = self.get_neighbors(node=node)
@@ -212,6 +165,16 @@ class GeometricGraph(Graph):
             if 0 < n.distance_from(node) <= radius:
                 nodes_in_radius.add(n)
         return nodes_in_radius
+
+    def find_closest_node_to_connectivity_component(self, connectivity_component):
+        nodes_distance = set()
+        for cc in self.get_connectivity_components():
+            if cc == connectivity_component:
+                continue
+            nodes_distance.update([(from_cc_n.distance_from(cc_n), (from_cc_n, cc_n)) for cc_n in cc for from_cc_n in
+                                   connectivity_component])
+        info = min(nodes_distance)
+        return info[1]
 
 
 class DiskGraph(GeometricGraph):
@@ -235,9 +198,11 @@ class DiskGraph(GeometricGraph):
                 if all([not edge.is_on_edge(n) for edge in existing_edges]):
                     self.add_edge(node1=node, node2=n)
 
-    def add_node(self, node, *args, **kwargs):
-        super(DiskGraph, self).add_node(node=node, *args, **kwargs)
-        self.construct_edges(node=node)
+    def add_node(self, node_id, data=None, *args, **kwargs):
+        kw = {'halo': self.disk_radius}
+        kw.update(kwargs)
+        new_node = super(DiskGraph, self).add_node(node_id=node_id, data=data, *args, **kw)
+        self.construct_edges(node=new_node)
 
 
 class UDG(DiskGraph):

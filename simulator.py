@@ -1,7 +1,7 @@
 import random
 import datetime
 from network import InterestArea
-from geometry import Point
+from geometry.shapes import Point
 from ga import GA, GAStatistics
 
 test_interest_areas = [

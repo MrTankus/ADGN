@@ -1,11 +1,10 @@
-import copy
 import datetime
 import itertools
 import random
 
 import matplotlib
 
-from geometry import Circle
+from geometry.shapes import Circle, LineSegment
 
 matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
@@ -140,14 +139,26 @@ class GA(object):
     def add_relays(self):
         for agent in self.agents:
             network = agent.network
-            connectivity_component_pairs = itertools.combinations(network.graph.get_connectivity_components(), 2)
-            intersecting_connectivity_components = filter(lambda pair: network.get_connectivity_components_halos_intersections(cc1=pair[0], cc2=pair[1]), connectivity_component_pairs)
+            connectivity_components = network.graph.get_connectivity_components()
+            connectivity_component_pairs = set(itertools.combinations(connectivity_components, 2))
+            intersecting_connectivity_components = set(filter(lambda pair: network.get_connectivity_components_halos_intersections(cc1=pair[0], cc2=pair[1]), connectivity_component_pairs))
+            visited_components = set()
             if intersecting_connectivity_components:
-                for cc_pair in intersecting_connectivity_components:
-                    halo_intersecting_circles = network.get_connectivity_components_halos_intersections(cc1=cc_pair[0], cc2=cc_pair[1])
+                for cc1, cc2 in intersecting_connectivity_components:
+                    halo_intersecting_circles = network.get_connectivity_components_halos_intersections(cc1=cc1, cc2=cc2)
                     intersecting_circles = random.choice(list(halo_intersecting_circles))
                     _, relay_location = Circle.get_point_in_intersection(intersecting_circles)
                     network.add_relay(location=relay_location)
+                    visited_components.add(cc1)
+                    visited_components.add(cc2)
+            # isolated_ccs = connectivity_components - visited_components
+            # for cc in isolated_ccs:
+            #     closest_node_info = network.graph.find_closest_node_to_connectivity_component(connectivity_component=cc)
+            #     node_in_cc = closest_node_info[0][0]
+            #     node_in_other_cc = closest_node_info[0][1]
+            #     other_cc = closest_node_info[1]
+
+
 
     def get_fittest(self):
         if self.fittest_agent:
