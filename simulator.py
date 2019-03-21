@@ -1,14 +1,14 @@
 import random
 import datetime
 from network import InterestArea
-from geometry.shapes import Point
 from ga import GA, GAStatistics
 
 test_interest_areas = [
-    InterestArea(center=Point(0, 0), radius=0.5, name='HUB', is_hub=True),
-    InterestArea(center=Point(1, 0.5), radius=0.5, name='Omega1'),
-    InterestArea(center=Point(2, 0), radius=0.5, name='Omeg2'),
-    InterestArea(center=Point(1, -0.5), radius=0.5, name='Omega3'),
+    InterestArea(center=(0, 0), radius=0.5, name='HUB', is_hub=True),
+    InterestArea(center=(1, 0.5), radius=0.5, name='Omega1'),
+    InterestArea(center=(2, 0), radius=0.5, name='Omeg2'),
+    InterestArea(center=(1, -0.5), radius=0.5, name='Omega3'),
+    InterestArea(center=(2, -1.8), radius=0.5, name='Omega4'),
 ]
 
 
@@ -16,8 +16,8 @@ def generate_interest_areas(num_of_interest_areas, xlims, ylims, allow_overlappi
     interest_areas = set()
     interest_area_id = 1
     while len(interest_areas) < num_of_interest_areas:
-        ia = InterestArea(center=Point(x=(xlims[0] + 1) + (xlims[1] - 1 - xlims[0] - 1) * random.random(),
-                                       y=(ylims[0] + 1) + (ylims[1] - 1 - ylims[0] - 1) * random.random()),
+        ia = InterestArea(center=((xlims[0] + 1) + (xlims[1] - 1 - xlims[0] - 1) * random.random(),
+                                  (ylims[0] + 1) + (ylims[1] - 1 - ylims[0] - 1) * random.random()),
                           radius=0.3 + 0.2 * random.random(), name='IA-' + str(interest_area_id))
         if not allow_overlapping:
             if not any(other.intersects(ia) for other in interest_areas):
@@ -40,7 +40,8 @@ def edges_fitness_function(network):
 
 def largest_connectivity_componenet_fitness_function(network):
     connectivity_components = network.graph.get_connectivity_components()
-    return max(map(lambda cc: len(cc), connectivity_components)) + len(network.graph.edges)
+    # return max(map(lambda cc: len(cc), connectivity_components)) + len(network.graph.edges)
+    return float(1 / len(connectivity_components))
 
 
 def main(*args, **kwargs):
@@ -88,8 +89,8 @@ if __name__ == '__main__':
     y_lims = (-6, 6)
     amount_of_interest_areas = 50
 
-    initial_population_size = 20
-    max_generations = 900
+    initial_population_size = 30
+    max_generations = 1200
 
     main(initial_population_size=initial_population_size, max_generations=max_generations,
          num_of_interest_reas=amount_of_interest_areas, xlims=x_lims, ylims=y_lims)

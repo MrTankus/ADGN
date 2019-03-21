@@ -27,10 +27,5 @@ class GeometricNode(Node):
         self.location = location
         self.halo = halo
 
-    def distance_from(self, geometric_node, metric=None):
-        if metric and callable(metric):
-            return metric(self, geometric_node)
-        return self.location.distance(geometric_node.location)
-
     def clone(self):
-        return GeometricNode(node_id=self.node_id, location=self.location.clone(), data=self.data, halo=self.halo)
+        return GeometricNode(node_id=self.node_id, location=tuple(self.location), data=self.data, halo=self.halo)

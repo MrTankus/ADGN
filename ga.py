@@ -4,7 +4,7 @@ import random
 
 import matplotlib
 
-from geometry.shapes import Circle, LineSegment
+from geometry.shapes import Circle
 
 matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
@@ -85,6 +85,7 @@ class GA(object):
             self.mutate()
             self.statistics.gen_snapshot(gen=gen, time_spent=(datetime.datetime.now() - start).total_seconds())
         self.calc_fitness()
+        # TODO - fix intersecting circles!
         print('Adding relays')
         self.add_relays()
         self.calc_fitness()
@@ -157,8 +158,6 @@ class GA(object):
             #     node_in_cc = closest_node_info[0][0]
             #     node_in_other_cc = closest_node_info[0][1]
             #     other_cc = closest_node_info[1]
-
-
 
     def get_fittest(self):
         if self.fittest_agent:

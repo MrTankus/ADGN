@@ -8,9 +8,8 @@ import math
 import random
 import uuid
 import hashlib
-from geometry.shapes import Point, Circle
+from geometry.shapes import Circle
 from graphs.graphs import UDG
-from graphs.nodes import GeometricNode
 
 
 class InterestArea(Circle):
@@ -26,18 +25,17 @@ class AdHocSensorNetwork(object):
     def __init__(self, interest_areas, nodes=None):
         self.interest_areas = set(interest_areas)
         self.graph = UDG(nodes=nodes)
-        self.interest_area_clusters = set()
         self.relays = set()
 
     @staticmethod
     def generate_random_sensor_location(interest_area, mid_center=False):
         if mid_center:
-            return Point(x=interest_area.center.x, y=interest_area.center.y)
+            return interest_area.center[0], interest_area.center[1]
         argument = 2 * math.pi * random.random()
         r = interest_area.radius * random.random()
-        x_location = interest_area.center.x + r * math.cos(argument)
-        y_location = interest_area.center.y + r * math.sin(argument)
-        return Point(x=x_location, y=y_location)
+        x_location = interest_area.center[0] + r * math.cos(argument)
+        y_location = interest_area.center[1] + r * math.sin(argument)
+        return x_location, y_location
 
     def randomize(self):
         sensor_id = 0
@@ -46,7 +44,6 @@ class AdHocSensorNetwork(object):
                 'interest_area': interest_area,
                 'is_relay': False
             }
-
             self.graph.add_node(node_id=sensor_id, data=data,
                                 location=self.generate_random_sensor_location(interest_area=interest_area,
                                                                               mid_center=interest_area.is_hub))
@@ -91,6 +88,7 @@ class AdHocSensorNetwork(object):
         data = {
             'is_relay': True
         }
+
         self.graph.add_node(node_id=random_node_id, data=data, location=location, *args, **kwargs)
         self.relays.add(random_node_id)
 
@@ -103,16 +101,31 @@ class AdHocSensorNetwork(object):
         '''
         sensor.location = self.generate_random_sensor_location(interest_area=sensor.get('interest_area'))
 
+    def export(self):
+        network_data = {
+            'interest_areas': [{
+                'center': interest_area.center,
+                'radius': interest_area.radius,
+                'is_hub': interest_area.is_hub
+            } for interest_area in self.interest_areas],
+            'sensors': [{
+                'node_id': node.node_id,
+                'location': node.location,
+                'halo': node.halo,
+
+            } for node in self.graph.nodes.values()]
+        }
+
     def plot(self, fig_id, title, xlims, ylims):
         plt.figure(fig_id)
         ax = plt.gca()
         for ia in self.interest_areas:
             color = 'blue' if not ia.is_hub else 'green'
-            c = CircleUI((ia.center.x, ia.center.y), ia.radius, facecolor=color, edgecolor='black')
+            c = CircleUI((ia.center[0], ia.center[1]), ia.radius, facecolor=color, edgecolor='black')
             c.set_alpha(0.5)
             c.set_label(ia.name)
             ax.add_patch(c)
-            ax.annotate(ia.name, xy=(ia.center.x, ia.center.y), fontsize=8, ha="center")
+            ax.annotate(ia.name, xy=(ia.center[0], ia.center[1]), fontsize=8, ha="center")
         sensors_xs = []
         sensors_ys = []
         relays_xs = []
@@ -120,17 +133,17 @@ class AdHocSensorNetwork(object):
         for sensor_id in self.graph.nodes:
             sensor = self.graph.nodes[sensor_id]
             if sensor.get(key='is_relay'):
-                relays_xs.append(sensor.location.x)
-                relays_ys.append(sensor.location.y)
+                relays_xs.append(sensor.location[0])
+                relays_ys.append(sensor.location[1])
             else:
-                sensors_xs.append(sensor.location.x)
-                sensors_ys.append(sensor.location.y)
+                sensors_xs.append(sensor.location[0])
+                sensors_ys.append(sensor.location[1])
         ax.scatter(sensors_xs, sensors_ys, s=5, c='red', alpha=1)
         ax.scatter(relays_xs, relays_ys, s=5, c='green', alpha=1)
         for edge in self.graph.edges:
             sensor1 = self.graph.nodes[edge.node1.node_id]
             sensor2 = self.graph.nodes[edge.node2.node_id]
-            ui_line = Line2D([sensor1.location.x, sensor2.location.x], [sensor1.location.y, sensor2.location.y],
+            ui_line = Line2D([sensor1.location[0], sensor2.location[0]], [sensor1.location[1], sensor2.location[1]],
                              linewidth=1, color='black')
             ax.add_line(ui_line)
 
