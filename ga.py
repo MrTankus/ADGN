@@ -1,21 +1,35 @@
 import datetime
+import hashlib
 import itertools
 import random
-
-import matplotlib
+import uuid
 
 from geometry.shapes import Circle
-
-matplotlib.use('TkAgg')
-import matplotlib.pyplot as plt
 
 from collections import defaultdict
 from network import AdHocSensorNetwork
 
 
+def breed_networks(n1, n2, interest_areas):
+    n1_nodes = list(n1.graph.nodes.values())
+    n2_nodes = list(n2.graph.nodes.values())
+
+    n1_partial_data = set(random.choices(n1_nodes, k=random.randint(0, int(len(n1_nodes) / 2))))
+    n2_compliment_data = set(node for node in filter(lambda n: n not in n1_partial_data, n2_nodes))
+    n2_partial_data = set(random.choices(n2_nodes, k=random.randint(0, int(len(n2_nodes) / 2))))
+    n1_compliment_data = set(node for node in filter(lambda n: n not in n2_partial_data, n1_nodes))
+
+    offspring1 = AdHocSensorNetwork(interest_areas=interest_areas,
+                                    nodes=set(map(lambda n: n.clone(), n1_partial_data.union(n2_compliment_data))))
+    offspring2 = AdHocSensorNetwork(interest_areas=interest_areas,
+                                    nodes=set(map(lambda n: n.clone(), n2_partial_data.union(n1_compliment_data))))
+    return offspring1, offspring2
+
+
 class Agent(object):
 
     def __init__(self, network, fitness_function):
+        self.agent_id = hashlib.sha256(str(uuid.uuid4()).encode()).hexdigest()
         self.network = network
         self.fitness_function = fitness_function
         self.fitness = 0
@@ -41,19 +55,6 @@ class GAStatistics(object):
         self.statistics[GAStatistics.GEN_FITNESS].append((gen, self.ga.get_fittest().fitness))
         self.statistics[GAStatistics.GEN_TIME].append((gen, time_spent))
 
-    def plot_statistic(self, name):
-        statistic = self.statistics.get(name)
-        if statistic:
-            plt.figure(name)
-            ax = plt.gca()
-            xs = list(map(lambda p: p[0], statistic))
-            ys = list(map(lambda p: p[1], statistic))
-            ax.scatter(xs, ys, s=5, c='red', alpha=1)
-            ax.set_title(name)
-            plt.show()
-        else:
-            print("No statistic with name {} was found".format(name))
-
 
 class GA(object):
 
@@ -66,6 +67,7 @@ class GA(object):
         self.mutation_factor = mutation_factor
         self.statistics = GAStatistics(ga=self)
         self.fittest_agent = None
+        self.initial_fittest = None
 
     def generate_initial_population(self):
         initial_agents = list()
@@ -75,17 +77,29 @@ class GA(object):
             initial_agents.append(Agent(network=network, fitness_function=self.fitness_function))
         self.agents = initial_agents
 
-    def evolve(self):
-        for gen in range(self.generations):
-            start = datetime.datetime.now()
-            print("Generation: " + str(gen))
-            self.calc_fitness()
-            self.selection()
-            self.breed()
-            self.mutate()
-            self.statistics.gen_snapshot(gen=gen, time_spent=(datetime.datetime.now() - start).total_seconds())
+    def evolve(self, pool=None):
+        self.initial_fittest = self.get_fittest()
+        if pool:
+            # Parallel evolution
+            for gen in range(self.generations):
+                start = datetime.datetime.now()
+                print("Generation: " + str(gen))
+                self.calc_fitness()
+                self.selection()
+                self.parallel_breed(pool=pool)
+                self.mutate()
+                self.statistics.gen_snapshot(gen=gen, time_spent=(datetime.datetime.now() - start).total_seconds())
+        else:
+            # Synchronous evolution
+            for gen in range(self.generations):
+                start = datetime.datetime.now()
+                print("Generation: " + str(gen))
+                self.calc_fitness()
+                self.selection()
+                self.breed()
+                self.mutate()
+                self.statistics.gen_snapshot(gen=gen, time_spent=(datetime.datetime.now() - start).total_seconds())
         self.calc_fitness()
-        # TODO - fix intersecting circles!
         print('Adding relays')
         self.add_relays()
         self.calc_fitness()
@@ -98,6 +112,21 @@ class GA(object):
     def selection(self):
         selected_agents = sorted(self.agents, key=lambda agent: agent.fitness, reverse=True)
         self.agents = selected_agents[:self.initial_population_size]
+
+    def parallel_breed(self, pool):
+        all_agents = set(self.agents)
+        random_parents = list()
+        while len(all_agents) > 1:
+            a1 = random.sample(all_agents, 1)[0]
+            all_agents.remove(a1)
+            a2 = random.sample(all_agents, 1)[0]
+            all_agents.remove(a2)
+            random_parents.append((a1.network, a2.network, self.interest_areas))
+
+        results = pool.starmap(breed_networks, random_parents)
+        for offspring1, offspring2 in results:
+            self.agents.append(Agent(network=offspring1, fitness_function=self.fitness_function))
+            self.agents.append(Agent(network=offspring2, fitness_function=self.fitness_function))
 
     def breed(self):
         all_agents = set(self.agents)
@@ -152,12 +181,6 @@ class GA(object):
                     network.add_relay(location=relay_location)
                     visited_components.add(cc1)
                     visited_components.add(cc2)
-            # isolated_ccs = connectivity_components - visited_components
-            # for cc in isolated_ccs:
-            #     closest_node_info = network.graph.find_closest_node_to_connectivity_component(connectivity_component=cc)
-            #     node_in_cc = closest_node_info[0][0]
-            #     node_in_other_cc = closest_node_info[0][1]
-            #     other_cc = closest_node_info[1]
 
     def get_fittest(self):
         if self.fittest_agent:

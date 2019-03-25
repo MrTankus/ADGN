@@ -1,15 +1,12 @@
-import matplotlib
-matplotlib.use('TkAgg')
-import matplotlib.pyplot as plt
-from matplotlib.patches import Circle as CircleUI
-from matplotlib.lines import Line2D
-
+import json
 import math
 import random
 import uuid
 import hashlib
+
 from geometry.shapes import Circle
 from graphs.graphs import UDG
+from graphs.nodes import GeometricNode
 
 
 class InterestArea(Circle):
@@ -65,15 +62,15 @@ class AdHocSensorNetwork(object):
     def get_connectivity_components_halos_intersections(self, cc1, cc2):
         cc1_halo = self.get_connectivity_component_halo(connectivity_component=cc1)
         cc2_halo = self.get_connectivity_component_halo(connectivity_component=cc2)
-        intersectin_circles = set()
+        intersecting_circles = set()
         visited_circles = set()
         for c1 in cc1_halo:
             for c2 in cc2_halo:
                 pair_set = frozenset([c1, c2])
                 if c1 != c2 and pair_set not in visited_circles and c1.intersects(c2):
                     visited_circles.add(pair_set)
-                    intersectin_circles.add((c1, c2))
-        return intersectin_circles
+                    intersecting_circles.add((c1, c2))
+        return intersecting_circles
 
     def move_sensor(self, sensor_id):
         if sensor_id not in self.graph.nodes:
@@ -101,9 +98,10 @@ class AdHocSensorNetwork(object):
         '''
         sensor.location = self.generate_random_sensor_location(interest_area=sensor.get('interest_area'))
 
-    def export(self):
+    def export(self, to_file):
         network_data = {
             'interest_areas': [{
+                'name': interest_area.name,
                 'center': interest_area.center,
                 'radius': interest_area.radius,
                 'is_hub': interest_area.is_hub
@@ -112,43 +110,30 @@ class AdHocSensorNetwork(object):
                 'node_id': node.node_id,
                 'location': node.location,
                 'halo': node.halo,
+                'interest_area': node.data['interest_area'].name if not node.data['is_relay'] else None,
+                'is_relay': node.data['is_relay']
 
             } for node in self.graph.nodes.values()]
         }
+        with open(to_file, 'w') as f:
+            f.write(json.dumps(network_data))
 
-    def plot(self, fig_id, title, xlims, ylims):
-        plt.figure(fig_id)
-        ax = plt.gca()
-        for ia in self.interest_areas:
-            color = 'blue' if not ia.is_hub else 'green'
-            c = CircleUI((ia.center[0], ia.center[1]), ia.radius, facecolor=color, edgecolor='black')
-            c.set_alpha(0.5)
-            c.set_label(ia.name)
-            ax.add_patch(c)
-            ax.annotate(ia.name, xy=(ia.center[0], ia.center[1]), fontsize=8, ha="center")
-        sensors_xs = []
-        sensors_ys = []
-        relays_xs = []
-        relays_ys = []
-        for sensor_id in self.graph.nodes:
-            sensor = self.graph.nodes[sensor_id]
-            if sensor.get(key='is_relay'):
-                relays_xs.append(sensor.location[0])
-                relays_ys.append(sensor.location[1])
-            else:
-                sensors_xs.append(sensor.location[0])
-                sensors_ys.append(sensor.location[1])
-        ax.scatter(sensors_xs, sensors_ys, s=5, c='red', alpha=1)
-        ax.scatter(relays_xs, relays_ys, s=5, c='green', alpha=1)
-        for edge in self.graph.edges:
-            sensor1 = self.graph.nodes[edge.node1.node_id]
-            sensor2 = self.graph.nodes[edge.node2.node_id]
-            ui_line = Line2D([sensor1.location[0], sensor2.location[0]], [sensor1.location[1], sensor2.location[1]],
-                             linewidth=1, color='black')
-            ax.add_line(ui_line)
-
-        ax.set_title('Adhoc Network')
-        plt.xlim(xlims[0], xlims[1])
-        plt.ylim(ylims[0], ylims[1])
-        plt.title(title)
-        plt.show()
+    @classmethod
+    def import_network(cls, from_file):
+        with open(from_file, 'r') as f:
+            network_json = json.loads(f.read())
+            interest_areas = dict()
+            nodes = set()
+            for ia in network_json['interest_areas']:
+                interest_areas[ia['name']] = InterestArea(center=tuple(ia['center']), radius=ia['radius'], name=ia['name'],
+                                                          is_hub=ia['is_hub'])
+            for node in network_json['sensors']:
+                node_data = {
+                    'is_relay': node['is_relay']
+                }
+                if not node['is_relay']:
+                    node_data['interest_area'] = interest_areas.get(node['interest_area'])
+                nodes.add(GeometricNode(node_id=node['node_id'], location=node['location'], data=node_data,
+                                        halo=node['halo']))
+            network = cls(interest_areas=interest_areas.values(), nodes=nodes)
+        return network

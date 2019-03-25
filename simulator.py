@@ -1,7 +1,11 @@
 import random
 import datetime
+from multiprocessing.pool import Pool
+
+from analysis.network_analysis import check_resilience
 from network import InterestArea
 from ga import GA, GAStatistics
+from utils import plot_network, plot_statistics
 
 test_interest_areas = [
     InterestArea(center=(0, 0), radius=0.5, name='HUB', is_hub=True),
@@ -41,7 +45,7 @@ def edges_fitness_function(network):
 def largest_connectivity_componenet_fitness_function(network):
     connectivity_components = network.graph.get_connectivity_components()
     # return max(map(lambda cc: len(cc), connectivity_components)) + len(network.graph.edges)
-    return float(1 / len(connectivity_components))
+    return float(1 / len(connectivity_components)) + len(network.graph.edges)
 
 
 def main(*args, **kwargs):
@@ -58,39 +62,40 @@ def main(*args, **kwargs):
                                              allow_overlapping=False)
 
     # GA - will always mutate (mutation factor = 1)
+
     ga = GA(interest_areas=interest_areas, initial_population_size=population_size, generations=generations,
             fitness_function=largest_connectivity_componenet_fitness_function, mutation_factor=1)
 
     ga.generate_initial_population()
-
-    # Fittest member in initial population
-    fittest_agent = ga.get_fittest()
-    network = fittest_agent.network
-    network.plot(fig_id=1, title='initial fittest', xlims=kwargs.get('xlims'), ylims=kwargs.get('ylims'))
-
-    # Run GA
     start = datetime.datetime.now()
-    ga.evolve()
+
+    if kwargs.get('parallel', False):
+        with Pool() as pool:
+            ga.evolve(pool=pool)
+    else:
+        ga.evolve()
+
     end = datetime.datetime.now() - start
     print("GA took {} seconds to complete".format(end.total_seconds()))
-
     # Fittest member in evolved population
     fittest_agent = ga.get_fittest()
     network = fittest_agent.network
-    network.plot(fig_id=1, title='final fittest', xlims=kwargs.get('xlims'), ylims=kwargs.get('ylims'))
+    plot_network(network=ga.initial_fittest.network, title='initial fittest', xlims=kwargs.get('xlims'), ylims=kwargs.get('ylims'))
+    plot_network(network=network, title='final fittest', xlims=kwargs.get('xlims'), ylims=kwargs.get('ylims'))
 
     # Plotting statistics
-    ga.statistics.plot_statistic(name=GAStatistics.GEN_FITNESS)
-    ga.statistics.plot_statistic(name=GAStatistics.GEN_TIME)
+    plot_statistics(statistic=ga.statistics.statistics.get(GAStatistics.GEN_FITNESS), name=GAStatistics.GEN_FITNESS)
+    plot_statistics(statistic=ga.statistics.statistics.get(GAStatistics.GEN_TIME), name=GAStatistics.GEN_TIME)
+    plot_statistics(name='Resilience', statistic=check_resilience(network=network), with_id_line=True)
 
 
 if __name__ == '__main__':
     x_lims = (-6, 6)
     y_lims = (-6, 6)
-    amount_of_interest_areas = 50
+    amount_of_interest_areas = 60
 
-    initial_population_size = 30
+    initial_population_size = 20
     max_generations = 1200
 
     main(initial_population_size=initial_population_size, max_generations=max_generations,
-         num_of_interest_reas=amount_of_interest_areas, xlims=x_lims, ylims=y_lims)
+         num_of_interest_reas=amount_of_interest_areas, xlims=x_lims, ylims=y_lims, parallel=True)
