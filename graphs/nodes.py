@@ -1,3 +1,6 @@
+from geometry.metrics import euclidean_metric
+from geometry.shapes import Circle
+
 
 class Node(object):
 
@@ -22,10 +25,17 @@ class Node(object):
 
 class GeometricNode(Node):
 
-    def __init__(self, node_id, location, data=None, halo=None):
+    def __init__(self, node_id, location, data=None, halo=None, metric=euclidean_metric):
         super(GeometricNode, self).__init__(node_id=node_id, data=data)
         self.location = location
         self.halo = halo
+        self.metric = metric
 
     def clone(self):
         return GeometricNode(node_id=self.node_id, location=tuple(self.location), data=self.data, halo=self.halo)
+
+    def get_node_halo(self):
+        return Circle(center=self.location, radius=self.halo)
+
+    def distance_from(self, node):
+        return self.metric(self.location, node.location)

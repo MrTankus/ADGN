@@ -56,12 +56,9 @@ class AdHocSensorNetwork(object):
             else:
                 return random.choice(self.graph.nodes)
 
-    def get_connectivity_component_halo(self, connectivity_component):
-        return map(lambda sensor: Circle(center=sensor.location, radius=sensor.halo), connectivity_component)
-
     def get_connectivity_components_halos_intersections(self, cc1, cc2):
-        cc1_halo = self.get_connectivity_component_halo(connectivity_component=cc1)
-        cc2_halo = self.get_connectivity_component_halo(connectivity_component=cc2)
+        cc1_halo = map(lambda sensor: sensor.get_node_halo(), cc1)
+        cc2_halo = map(lambda sensor: sensor.get_node_halo(), cc2)
         intersecting_circles = set()
         visited_circles = set()
         for c1 in cc1_halo:
@@ -71,6 +68,13 @@ class AdHocSensorNetwork(object):
                     visited_circles.add(pair_set)
                     intersecting_circles.add((c1, c2))
         return intersecting_circles
+
+    def get_other_ccs_info(self, connectivity_component):
+        all_ccs = self.graph.get_connectivity_components() - connectivity_component
+        res = list()
+        for cc in all_ccs:
+            res.extend([(n1.distance_from(n2), [n1, n2], cc, n1.get_node_halo().intersects(n2.get_node_halo())) for n1 in connectivity_component for n2 in cc])
+        return sorted(res, key=lambda t: t[0])
 
     def move_sensor(self, sensor_id):
         if sensor_id not in self.graph.nodes:
@@ -88,6 +92,14 @@ class AdHocSensorNetwork(object):
 
         self.graph.add_node(node_id=random_node_id, data=data, location=location, *args, **kwargs)
         self.relays.add(random_node_id)
+
+    def add_relays_between_sensors(self, n1, n2):
+        distance_between_sensors = self.graph.geo_distance(n1, n2)
+        number_of_sensors = int(distance_between_sensors)
+        relay_location = n1.location
+        for i in range(number_of_sensors):
+            relay_location = (relay_location[0] + (i+1)/number_of_sensors, relay_location[1] + (i+1)/number_of_sensors)
+            self.add_relay(location=relay_location)
 
     def hop_random(self, sensor):
         '''

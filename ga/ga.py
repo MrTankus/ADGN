@@ -1,59 +1,24 @@
 import datetime
 import hashlib
 import itertools
-import random
 import uuid
+import random
 
-from geometry.shapes import Circle
-
-from collections import defaultdict
+from ga.statistics import GAStatistics
+from ga.parallel import breed_networks, calc_fitness
 from network import AdHocSensorNetwork
-
-
-def breed_networks(n1, n2, interest_areas):
-    n1_nodes = list(n1.graph.nodes.values())
-    n2_nodes = list(n2.graph.nodes.values())
-
-    n1_partial_data = set(random.choices(n1_nodes, k=random.randint(0, int(len(n1_nodes) / 2))))
-    n2_compliment_data = set(node for node in filter(lambda n: n not in n1_partial_data, n2_nodes))
-    n2_partial_data = set(random.choices(n2_nodes, k=random.randint(0, int(len(n2_nodes) / 2))))
-    n1_compliment_data = set(node for node in filter(lambda n: n not in n2_partial_data, n1_nodes))
-
-    offspring1 = AdHocSensorNetwork(interest_areas=interest_areas,
-                                    nodes=set(map(lambda n: n.clone(), n1_partial_data.union(n2_compliment_data))))
-    offspring2 = AdHocSensorNetwork(interest_areas=interest_areas,
-                                    nodes=set(map(lambda n: n.clone(), n2_partial_data.union(n1_compliment_data))))
-    return offspring1, offspring2
+from geometry.shapes import Circle
 
 
 class Agent(object):
 
-    def __init__(self, network, fitness_function):
+    def __init__(self, network):
         self.agent_id = hashlib.sha256(str(uuid.uuid4()).encode()).hexdigest()
         self.network = network
-        self.fitness_function = fitness_function
         self.fitness = 0
-        self.calc_fitness()
-
-    def calc_fitness(self):
-        self.fitness = self.fitness_function(network=self.network)
 
     def __lt__(self, other):
         return self.fitness > other.fitness
-
-
-class GAStatistics(object):
-
-    GEN_FITNESS = 'Gen-Fitness'
-    GEN_TIME = 'Gen-Time'
-
-    def __init__(self, ga):
-        self.ga = ga
-        self.statistics = defaultdict(list)
-
-    def gen_snapshot(self, gen, time_spent):
-        self.statistics[GAStatistics.GEN_FITNESS].append((gen, self.ga.get_fittest().fitness))
-        self.statistics[GAStatistics.GEN_TIME].append((gen, time_spent))
 
 
 class GA(object):
@@ -63,6 +28,7 @@ class GA(object):
         self.initial_population_size = initial_population_size
         self.fitness_function = fitness_function
         self.agents = None
+        self.agent_mapping = dict()
         self.generations = generations
         self.mutation_factor = mutation_factor
         self.statistics = GAStatistics(ga=self)
@@ -74,7 +40,10 @@ class GA(object):
         for i in range(self.initial_population_size):
             network = AdHocSensorNetwork(interest_areas=self.interest_areas)
             network.randomize()
-            initial_agents.append(Agent(network=network, fitness_function=self.fitness_function))
+            agent = Agent(network=network)
+            agent.fitness = self.fitness_function(network=agent.network)
+            initial_agents.append(agent)
+            self.agent_mapping[agent.agent_id] = agent
         self.agents = initial_agents
 
     def evolve(self, pool=None):
@@ -94,7 +63,8 @@ class GA(object):
             for gen in range(self.generations):
                 start = datetime.datetime.now()
                 print("Generation: " + str(gen))
-                self.calc_fitness()
+                self.parallel_calc_fitness(pool=pool)
+                # self.calc_fitness()
                 self.selection()
                 self.breed()
                 self.mutate()
@@ -102,11 +72,20 @@ class GA(object):
         self.calc_fitness()
         print('Adding relays')
         self.add_relays()
+        print('Recalculating fitness')
         self.calc_fitness()
+        print("Finished GA")
+
+    def parallel_calc_fitness(self, pool):
+        results = pool.starmap(calc_fitness, list(map(lambda agent: (agent, self.fitness_function), self.agents)))
+        for agent_id, fitness in results:
+            agent = self.agent_mapping.get(agent_id)
+            if agent:
+                agent.fitness = fitness
 
     def calc_fitness(self):
         for agent in self.agents:
-            agent.calc_fitness()
+            agent.fitness = self.fitness_function(network=agent.network)
             self.fittest_agent = agent if self.fittest_agent is None or self.fittest_agent.fitness < agent.fitness else self.fittest_agent
 
     def selection(self):
@@ -125,8 +104,12 @@ class GA(object):
 
         results = pool.starmap(breed_networks, random_parents)
         for offspring1, offspring2 in results:
-            self.agents.append(Agent(network=offspring1, fitness_function=self.fitness_function))
-            self.agents.append(Agent(network=offspring2, fitness_function=self.fitness_function))
+            a1 = Agent(network=offspring1)
+            a1.fitness = self.fitness_function(network=a1.network)
+            a2 = Agent(network=offspring2)
+            a2.fitness = self.fitness_function(network=a2.network)
+            self.agents.append(a1)
+            self.agents.append(a2)
 
     def breed(self):
         all_agents = set(self.agents)
@@ -181,6 +164,18 @@ class GA(object):
                     network.add_relay(location=relay_location)
                     visited_components.add(cc1)
                     visited_components.add(cc2)
+            # TODO - fix bug in isolated connectivity components
+            # network.graph.invalidate_connectivity_component()
+            # connectivity_components = network.graph.get_connectivity_components()
+            # visited_components.clear()
+            # for cc in connectivity_components:
+            #     closest_cc_infos = network.get_closest_non_intersecting_ccs(to=cc)
+            #     if len(closest_cc_infos):
+            #         continue
+            #     closest_cc_info = closest_cc_infos[0]
+            #     if (cc, closest_cc_info[2]) not in visited_components:
+            #         visited_components.add((cc, closest_cc_info[2]))
+            #         network.add_relays_between_sensors(n1=closest_cc_info[1][0], n2=closest_cc_info[1][1])
 
     def get_fittest(self):
         if self.fittest_agent:

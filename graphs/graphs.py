@@ -130,11 +130,14 @@ class Graph(object):
                         shortest = new_path
         return shortest
 
-    def invalidate_connectivity_component(self, node):
-        cc = self._connectivity_components.get(node.node_id)
-        if cc:
-            for n in cc:
-                self._connectivity_components.pop(n.node_id, None)
+    def invalidate_connectivity_component(self, node=None):
+        if not node:
+            self._connectivity_components.clear()
+        else:
+            cc = self._connectivity_components.get(node.node_id)
+            if cc:
+                for n in cc:
+                    self._connectivity_components.pop(n.node_id, None)
 
 
 class GeometricGraph(Graph):
@@ -177,6 +180,9 @@ class GeometricGraph(Graph):
                                    connectivity_component])
         info = min(nodes_distance)
         return info[1]
+
+    def geo_distance(self, n1, n2):
+        return self.metric(p1=n1.location, p2=n2.location)
 
 
 class DiskGraph(GeometricGraph):

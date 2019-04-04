@@ -3,8 +3,10 @@ import datetime
 from multiprocessing.pool import Pool
 
 from analysis.network_analysis import check_resilience
+from analysis.fitness_functions import sum_square_connectivity_componenet_fitness_function
 from network import InterestArea
-from ga import GA, GAStatistics
+from ga.ga import GA
+from ga.statistics import GAStatistics
 from utils import plot_network, plot_statistics
 
 test_interest_areas = [
@@ -38,16 +40,6 @@ def generate_interest_areas(num_of_interest_areas, xlims, ylims, allow_overlappi
     return interest_areas
 
 
-def edges_fitness_function(network):
-    return len(network.graph.edges)
-
-
-def largest_connectivity_componenet_fitness_function(network):
-    connectivity_components = network.graph.get_connectivity_components()
-    # return max(map(lambda cc: len(cc), connectivity_components)) + len(network.graph.edges)
-    return float(1 / len(connectivity_components)) + len(network.graph.edges)
-
-
 def main(*args, **kwargs):
     population_size = kwargs.get('initial_population_size')
     generations = kwargs.get('max_generations')
@@ -64,7 +56,7 @@ def main(*args, **kwargs):
     # GA - will always mutate (mutation factor = 1)
 
     ga = GA(interest_areas=interest_areas, initial_population_size=population_size, generations=generations,
-            fitness_function=largest_connectivity_componenet_fitness_function, mutation_factor=1)
+            fitness_function=sum_square_connectivity_componenet_fitness_function, mutation_factor=1)
 
     ga.generate_initial_population()
     start = datetime.datetime.now()
@@ -86,7 +78,8 @@ def main(*args, **kwargs):
     # Plotting statistics
     plot_statistics(statistic=ga.statistics.statistics.get(GAStatistics.GEN_FITNESS), name=GAStatistics.GEN_FITNESS)
     plot_statistics(statistic=ga.statistics.statistics.get(GAStatistics.GEN_TIME), name=GAStatistics.GEN_TIME)
-    plot_statistics(name='Resilience', statistic=check_resilience(network=network), with_id_line=True)
+    plot_statistics(name='Resilience', statistic=check_resilience(network=network),
+                    generate_ys=lambda xs: list(map(lambda x: x, xs)))
 
 
 if __name__ == '__main__':
@@ -95,7 +88,7 @@ if __name__ == '__main__':
     amount_of_interest_areas = 60
 
     initial_population_size = 20
-    max_generations = 1200
+    max_generations = 200
 
     main(initial_population_size=initial_population_size, max_generations=max_generations,
          num_of_interest_reas=amount_of_interest_areas, xlims=x_lims, ylims=y_lims, parallel=True)

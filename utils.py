@@ -44,15 +44,15 @@ def plot_network(network, title, xlims, ylims):
     plt.show()
 
 
-def plot_statistics(name, statistic, with_id_line=False):
+def plot_statistics(name, statistic, generate_ys=None):
     if statistic:
         plt.figure(name)
         ax = plt.gca()
         xs = list(map(lambda p: p[0], statistic))
         ys = list(map(lambda p: p[1], statistic))
         ax.scatter(xs, ys, s=5, c='red', alpha=1)
-        if with_id_line:
-            ax.scatter(xs, xs, s=5, c='black', alpha=1)
+        if generate_ys:
+            ax.scatter(xs, generate_ys(xs), s=5, c='black', alpha=1)
         ax.set_title(name)
         plt.show()
     else:
