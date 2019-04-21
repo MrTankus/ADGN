@@ -23,13 +23,23 @@ def avg_on_paths_length_fitness_function(network):
     # TODO - Bug here? final calc fitness after relays are places hangs.
     sensors = filter(lambda node: not node.get('is_relay'), network.graph.nodes.values())
     sensors_pairs = itertools.combinations(sensors, 2)
-    paths = list(filter(bool, [network.graph.get_shortest_path(n1, n2) for (n1, n2) in sensors_pairs]))
+    paths = list(filter(bool, [network.graph.dijkstra(n1, n2) for (n1, n2) in sensors_pairs]))
     path_distances = list(map(len, paths))
-    return len(path_distances) / sum(path_distances)
+    sum_path_distances = sum(path_distances)
+    if len(path_distances):
+        return sum_path_distances / len(path_distances)
+    return 0
 
 
 def harmonic_avg_on_paths_length_fitness_function(network):
-    pass
+    sensors = filter(lambda node: not node.get('is_relay'), network.graph.nodes.values())
+    sensors_pairs = itertools.combinations(sensors, 2)
+    paths = list(filter(bool, [network.graph.dijkstra(n1, n2) for (n1, n2) in sensors_pairs]))
+    path_distances = list(map(lambda l: 1/l, map(len, paths)))
+    sum_path_distances = sum(path_distances)
+    if sum_path_distances:
+        return len(path_distances) / sum_path_distances
+    return 0
 
 
 def robustness_fitness_function(network):

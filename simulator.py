@@ -3,7 +3,7 @@ import datetime
 from multiprocessing.pool import Pool
 
 from analysis.network_analysis import check_resilience
-from analysis.fitness_functions import sum_square_connectivity_componenet_fitness_function
+from analysis.fitness_functions import sum_square_connectivity_componenet_fitness_function, avg_on_paths_length_fitness_function
 from network import InterestArea
 from ga.ga import GA
 from ga.statistics import GAStatistics
@@ -56,7 +56,7 @@ def main(*args, **kwargs):
     # GA - will always mutate (mutation factor = 1)
 
     ga = GA(interest_areas=interest_areas, initial_population_size=population_size, generations=generations,
-            fitness_function=sum_square_connectivity_componenet_fitness_function, mutation_factor=1)
+            fitness_function=avg_on_paths_length_fitness_function, mutation_factor=1)
 
     ga.generate_initial_population()
     start = datetime.datetime.now()
@@ -83,9 +83,10 @@ def main(*args, **kwargs):
 
 
 if __name__ == '__main__':
-    x_lims = (-6, 6)
-    y_lims = (-6, 6)
-    amount_of_interest_areas = 60
+    s = 6
+    x_lims = (-s, s)
+    y_lims = (-s, s)
+    amount_of_interest_areas = 50
 
     initial_population_size = 20
     max_generations = 200

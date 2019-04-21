@@ -1,3 +1,4 @@
+import math
 from collections import defaultdict, deque
 
 from graphs.edges import Edge, GeometricEdge
@@ -99,19 +100,50 @@ class Graph(object):
                 q.append(connected_node)
         return frozenset(connectivity_component)
 
-    def get_all_paths(self, source, destination, path=[]):
-        if source.node_id not in self.nodes:
-            return []
-        path = path + [source]
-        if source == destination:
-            return [path]
-        paths = []
-        for node in self.get_neighbors(node=source):
-            if node not in path:
-                new_paths = self.get_all_paths(source=node, destination=destination, path=path)
-                for p in new_paths:
-                    paths.append(p)
-        return paths
+    def dijkstra(self, source, dest):
+        # 1. Mark all nodes unvisited and store them.
+        # 2. Set the distance to zero for our initial node
+        # and to infinity for other nodes.
+        distances = {vertex: math.inf for vertex in self.nodes.values()}
+        previous_vertices = {
+            vertex: None for vertex in self.nodes.values()
+        }
+        distances[source] = 0
+        vertices = set(self.nodes.values())
+
+        while vertices:
+            # 3. Select the unvisited node with the smallest distance,
+            # it's current node now.
+            current_vertex = min(
+                vertices, key=lambda vertex: distances[vertex])
+
+            # 6. Stop, if the smallest distance
+            # among the unvisited nodes is infinity.
+            if distances[current_vertex] == math.inf:
+                break
+
+            # 4. Find unvisited neighbors for the current node
+            # and calculate their distances through the current node.
+            for neighbour in self.get_neighbors(current_vertex):
+                alternative_route = distances[current_vertex]
+
+                # Compare the newly calculated distance to the assigned
+                # and save the smaller one.
+                if alternative_route < distances[neighbour]:
+                    distances[neighbour] = alternative_route
+                    previous_vertices[neighbour] = current_vertex
+
+            # 5. Mark the current node as visited
+            # and remove it from the unvisited set.
+            vertices.remove(current_vertex)
+
+        path, current_vertex = deque(), dest
+        while previous_vertices[current_vertex] is not None:
+            path.appendleft(current_vertex)
+            current_vertex = previous_vertices[current_vertex]
+        if path:
+            path.appendleft(current_vertex)
+        return path
 
     def get_shortest_path(self, source, destination, path=[]):
         if source.node_id not in self.nodes:

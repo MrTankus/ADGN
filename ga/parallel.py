@@ -19,5 +19,5 @@ def breed_networks(n1, n2, interest_areas):
     return offspring1, offspring2
 
 
-def calc_fitness(agent, fitness_func):
-    return agent.agent_id, fitness_func(network=agent.network)
+def calc_fitness(agent_id, network, fitness_func):
+    return agent_id, fitness_func(network=network)

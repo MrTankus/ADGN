@@ -110,7 +110,7 @@ class AdHocSensorNetwork(object):
         '''
         sensor.location = self.generate_random_sensor_location(interest_area=sensor.get('interest_area'))
 
-    def export(self, to_file):
+    def as_json(self):
         network_data = {
             'interest_areas': [{
                 'name': interest_area.name,
@@ -127,25 +127,32 @@ class AdHocSensorNetwork(object):
 
             } for node in self.graph.nodes.values()]
         }
+        return json.dumps(network_data)
+
+    @classmethod
+    def from_json(cls, network_json):
+        interest_areas = dict()
+        nodes = set()
+        for ia in network_json['interest_areas']:
+            interest_areas[ia['name']] = InterestArea(center=tuple(ia['center']), radius=ia['radius'], name=ia['name'],
+                                                      is_hub=ia['is_hub'])
+        for node in network_json['sensors']:
+            node_data = {
+                'is_relay': node['is_relay']
+            }
+            if not node['is_relay']:
+                node_data['interest_area'] = interest_areas.get(node['interest_area'])
+            nodes.add(GeometricNode(node_id=node['node_id'], location=node['location'], data=node_data,
+                                    halo=node['halo']))
+        return cls(interest_areas=interest_areas.values(), nodes=nodes)
+
+    def export(self, to_file):
         with open(to_file, 'w') as f:
-            f.write(json.dumps(network_data))
+            f.write(self.as_json())
 
     @classmethod
     def import_network(cls, from_file):
         with open(from_file, 'r') as f:
             network_json = json.loads(f.read())
-            interest_areas = dict()
-            nodes = set()
-            for ia in network_json['interest_areas']:
-                interest_areas[ia['name']] = InterestArea(center=tuple(ia['center']), radius=ia['radius'], name=ia['name'],
-                                                          is_hub=ia['is_hub'])
-            for node in network_json['sensors']:
-                node_data = {
-                    'is_relay': node['is_relay']
-                }
-                if not node['is_relay']:
-                    node_data['interest_area'] = interest_areas.get(node['interest_area'])
-                nodes.add(GeometricNode(node_id=node['node_id'], location=node['location'], data=node_data,
-                                        halo=node['halo']))
-            network = cls(interest_areas=interest_areas.values(), nodes=nodes)
+            network = cls.from_json(network_json=network_json)
         return network

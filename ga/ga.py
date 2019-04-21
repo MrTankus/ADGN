@@ -53,7 +53,7 @@ class GA(object):
             for gen in range(self.generations):
                 start = datetime.datetime.now()
                 print("Generation: " + str(gen))
-                self.calc_fitness()
+                self.parallel_calc_fitness(pool=pool)
                 self.selection()
                 self.parallel_breed(pool=pool)
                 self.mutate()
@@ -63,21 +63,23 @@ class GA(object):
             for gen in range(self.generations):
                 start = datetime.datetime.now()
                 print("Generation: " + str(gen))
-                self.parallel_calc_fitness(pool=pool)
+                self.calc_fitness()
                 # self.calc_fitness()
                 self.selection()
                 self.breed()
                 self.mutate()
                 self.statistics.gen_snapshot(gen=gen, time_spent=(datetime.datetime.now() - start).total_seconds())
-        self.calc_fitness()
         print('Adding relays')
         self.add_relays()
         print('Recalculating fitness')
-        self.calc_fitness()
+        if pool:
+            self.parallel_calc_fitness(pool=pool)
+        else:
+            self.calc_fitness()
         print("Finished GA")
 
     def parallel_calc_fitness(self, pool):
-        results = pool.starmap(calc_fitness, list(map(lambda agent: (agent, self.fitness_function), self.agents)))
+        results = pool.starmap(calc_fitness, list(map(lambda agent: (agent.agent_id, agent.network, self.fitness_function), self.agents)))
         for agent_id, fitness in results:
             agent = self.agent_mapping.get(agent_id)
             if agent:
@@ -137,8 +139,8 @@ class GA(object):
 
             second_born_nodes = set(map(lambda n: n.clone(), a2_nodes.union(compliment_in_a1)))
             second_born = AdHocSensorNetwork(interest_areas=self.interest_areas, nodes=second_born_nodes)
-            offsprings.add(Agent(network=first_born, fitness_function=self.fitness_function))
-            offsprings.add(Agent(network=second_born, fitness_function=self.fitness_function))
+            offsprings.add(Agent(network=first_born))
+            offsprings.add(Agent(network=second_born))
         self.agents.extend(offsprings)
 
     def mutate(self):
