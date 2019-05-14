@@ -1,6 +1,6 @@
 import random
 
-from network import AdHocSensorNetwork
+from network.v1.network import AdHocSensorNetwork
 
 
 def breed_networks(n1, n2, interest_areas):

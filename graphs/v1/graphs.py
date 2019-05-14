@@ -1,8 +1,8 @@
 import math
 from collections import defaultdict, deque
 
-from graphs.edges import Edge, GeometricEdge
-from graphs.nodes import Node, GeometricNode
+from graphs.v1.edges import Edge, GeometricEdge
+from graphs.v1.nodes import Node, GeometricNode
 from geometry.metrics import euclidean_metric
 
 
@@ -67,13 +67,9 @@ class Graph(object):
                 self._neighbors[node.node_id].add(edge.node1)
         return self._neighbors[node.node_id]
 
-    def is_connected(self):
-        return len(self.get_connectivity_components()) == 1
-
     def get_connectivity_components(self):
-        all_nodes = map(lambda item: item[1], self.nodes.items())
         visited_nodes = set()
-        for node in all_nodes:
+        for node in self.nodes.values():
             if node in visited_nodes:
                 continue
             if self._connectivity_components.get(node.node_id):
@@ -96,11 +92,11 @@ class Graph(object):
             connectivity_component.add(n)
             visited_nodes.add(n)
             connected_nodes = self.get_neighbors(node=n) - visited_nodes
-            for connected_node in connected_nodes:
-                q.append(connected_node)
+            q.extend(connected_nodes)
         return frozenset(connectivity_component)
 
-    def dijkstra(self, source, dest):
+    def get_path(self, source, dest):
+        # dijkstra's algorithm
         # 1. Mark all nodes unvisited and store them.
         # 2. Set the distance to zero for our initial node
         # and to infinity for other nodes.
@@ -124,6 +120,7 @@ class Graph(object):
 
             # 4. Find unvisited neighbors for the current node
             # and calculate their distances through the current node.
+            # TODO - add cost here!
             for neighbour in self.get_neighbors(current_vertex):
                 alternative_route = distances[current_vertex]
 
@@ -145,23 +142,6 @@ class Graph(object):
             path.appendleft(current_vertex)
         return path
 
-    def get_shortest_path(self, source, destination, path=[]):
-        if source.node_id not in self.nodes:
-            return None
-        path = path + [source]
-        if source == destination:
-            return path
-
-        shortest = None
-        for node in self.get_neighbors(node=source):
-            if node not in path:
-                new_path = self.get_shortest_path(node, destination, path)
-                if new_path:
-                    # TODO - take in consideration cost_function
-                    if not shortest or len(new_path) < len(shortest):
-                        shortest = new_path
-        return shortest
-
     def invalidate_connectivity_component(self, node=None):
         if not node:
             self._connectivity_components.clear()
@@ -170,6 +150,9 @@ class Graph(object):
             if cc:
                 for n in cc:
                     self._connectivity_components.pop(n.node_id, None)
+
+    def validate(self):
+        pass
 
 
 class GeometricGraph(Graph):
@@ -244,6 +227,12 @@ class DiskGraph(GeometricGraph):
         kw.update(kwargs)
         new_node = super(DiskGraph, self).add_node(node_id=node_id, data=data, *args, **kw)
         self.construct_edges(node=new_node)
+
+    def validate(self):
+        for edge in self.edges:
+            n1 = edge.node1
+            n2 = edge.node2
+            assert n1.distance_from(n2) <= self.disk_radius
 
 
 class UDG(DiskGraph):

@@ -1,13 +1,24 @@
-import random
 import datetime
+import hashlib
+import json
+import os
+import uuid
 from multiprocessing.pool import Pool
 
-from analysis.network_analysis import check_resilience
-from analysis.fitness_functions import sum_square_connectivity_componenet_fitness_function, avg_on_paths_length_fitness_function
-from network import InterestArea
-from ga.ga import GA
-from ga.statistics import GAStatistics
-from utils import plot_network, plot_statistics
+if True:
+    from ga.v2.statistics import GAStatistics
+    from network.v2.interest_areas import InterestArea, InterestAreaGenerator
+    from analysis.v2.network_analysis import check_resilience
+    from analysis.v2.fitness_functions import FitnessFunctions
+    from ga.v2.ga import GA
+    from utils.v2.utils import plot_network, plot_statistics, save_network_image
+else:
+    from ga.v1.statistics import GAStatistics
+    from network.v1.interest_areas import InterestArea, InterestAreaGenerator
+    from analysis.v1.network_analysis import check_resilience
+    from analysis.v1.fitness_functions import FitnessFunctions
+    from ga.v1.ga import GA
+    from utils.v1.utils import plot_network, plot_statistics
 
 test_interest_areas = [
     InterestArea(center=(0, 0), radius=0.5, name='HUB', is_hub=True),
@@ -15,32 +26,14 @@ test_interest_areas = [
     InterestArea(center=(2, 0), radius=0.5, name='Omeg2'),
     InterestArea(center=(1, -0.5), radius=0.5, name='Omega3'),
     InterestArea(center=(2, -1.8), radius=0.5, name='Omega4'),
+
+    InterestArea(center=(5, 4), radius=0.5, name='Omega5'),
+    InterestArea(center=(3.5, 4.1), radius=0.5, name='Omega6'),
 ]
 
 
-def generate_interest_areas(num_of_interest_areas, xlims, ylims, allow_overlapping=False):
-    interest_areas = set()
-    interest_area_id = 1
-    while len(interest_areas) < num_of_interest_areas:
-        ia = InterestArea(center=((xlims[0] + 1) + (xlims[1] - 1 - xlims[0] - 1) * random.random(),
-                                  (ylims[0] + 1) + (ylims[1] - 1 - ylims[0] - 1) * random.random()),
-                          radius=0.3 + 0.2 * random.random(), name='IA-' + str(interest_area_id))
-        if not allow_overlapping:
-            if not any(other.intersects(ia) for other in interest_areas):
-                interest_areas.add(ia)
-                interest_area_id += 1
-        else:
-            interest_areas.add(ia)
-            interest_area_id += 1
-
-    hub = random.sample(interest_areas, 1)[0]
-    hub.name = 'HUB'
-    hub.is_hub = True
-
-    return interest_areas
-
-
 def main(*args, **kwargs):
+    run_id = hashlib.sha256(str(uuid.uuid4()).encode()).hexdigest()
     population_size = kwargs.get('initial_population_size')
     generations = kwargs.get('max_generations')
 
@@ -49,14 +42,22 @@ def main(*args, **kwargs):
     ylims = kwargs.get('ylims')
 
     print('Generating random interest areas')
-    # interest_areas = test_interest_areas
-    interest_areas = generate_interest_areas(num_of_interest_areas=num_of_interest_areas, xlims=xlims, ylims=ylims,
-                                             allow_overlapping=False)
+    interest_areas = None
+    if kwargs.get('load_interest_areas'):
+        interest_areas = InterestAreaGenerator.from_file('ia.json')
+    if not interest_areas:
+        interest_areas = InterestAreaGenerator.random(amount=num_of_interest_areas, xlims=xlims, ylims=ylims,
+                                                      allow_overlapping=False)
+
+        with open('ia.json', 'w') as file:
+            file.write(json.dumps([
+                ia.as_json_dict() for ia in interest_areas
+            ]))
 
     # GA - will always mutate (mutation factor = 1)
-
+    fitness_function = FitnessFunctions.get_fitness_function(FitnessFunctions.SUM_SQUARE_CC_SIZE)
     ga = GA(interest_areas=interest_areas, initial_population_size=population_size, generations=generations,
-            fitness_function=avg_on_paths_length_fitness_function, mutation_factor=1)
+            fitness_function=fitness_function, mutation_factor=1, network_image_saver=save_network_image, run_id=run_id)
 
     ga.generate_initial_population()
     start = datetime.datetime.now()
@@ -76,20 +77,39 @@ def main(*args, **kwargs):
     plot_network(network=network, title='final fittest', xlims=kwargs.get('xlims'), ylims=kwargs.get('ylims'))
 
     # Plotting statistics
-    plot_statistics(statistic=ga.statistics.statistics.get(GAStatistics.GEN_FITNESS), name=GAStatistics.GEN_FITNESS)
-    plot_statistics(statistic=ga.statistics.statistics.get(GAStatistics.GEN_TIME), name=GAStatistics.GEN_TIME)
-    plot_statistics(name='Resilience', statistic=check_resilience(network=network),
-                    generate_ys=lambda xs: list(map(lambda x: x, xs)))
+    plot_statistics(statistic=ga.statistics.get(GAStatistics.GEN_FITNESS), name=GAStatistics.GEN_FITNESS)
+    plot_statistics(statistic=ga.statistics.get(GAStatistics.GEN_TIME), name=GAStatistics.GEN_TIME)
+    # plot_statistics(name='Resilience', statistic=check_resilience(network=network),
+    #                 generate_ys=lambda xs: list(map(lambda x: x, xs)))
+
+    if kwargs.get('save', False):
+        print('saving ga and network data')
+        try:
+            dir_name = os.path.join(os.getcwd(), run_id)
+            os.mkdir(dir_name)
+            ga.initial_fittest.network.export(to_file=os.path.join(dir_name, run_id + '_initial.json'))
+            network.export(to_file=os.path.join(dir_name, run_id + '_final.json'))
+            with open(os.path.join(dir_name, run_id + '_metadata.json'), 'w') as metadata_file:
+                d = {
+                    'fitness_function': fitness_function.__name__,
+                    'gens': generations
+                }
+                metadata_file.write(json.dumps(d))
+        except:
+            pass
+    else:
+        print('not saving - finished GA')
 
 
 if __name__ == '__main__':
-    s = 6
+    s = 6.5
     x_lims = (-s, s)
     y_lims = (-s, s)
     amount_of_interest_areas = 50
 
     initial_population_size = 20
-    max_generations = 200
+    max_generations = 500
 
     main(initial_population_size=initial_population_size, max_generations=max_generations,
-         num_of_interest_reas=amount_of_interest_areas, xlims=x_lims, ylims=y_lims, parallel=True)
+         num_of_interest_reas=amount_of_interest_areas, xlims=x_lims, ylims=y_lims, parallel=False, save=False,
+         load_interest_areas=True)

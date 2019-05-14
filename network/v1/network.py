@@ -4,17 +4,8 @@ import random
 import uuid
 import hashlib
 
-from geometry.shapes import Circle
-from graphs.graphs import UDG
-from graphs.nodes import GeometricNode
-
-
-class InterestArea(Circle):
-
-    def __init__(self, center, radius, name, is_hub=False):
-        super(InterestArea, self).__init__(center=center, radius=radius)
-        self.name = name
-        self.is_hub = is_hub
+from graphs.v1.graphs import UDG
+from graphs.v1.nodes import GeometricNode
 
 
 class AdHocSensorNetwork(object):
@@ -109,6 +100,9 @@ class AdHocSensorNetwork(object):
         :return:
         '''
         sensor.location = self.generate_random_sensor_location(interest_area=sensor.get('interest_area'))
+
+    def validate(self):
+        self.graph.validate()
 
     def as_json(self):
         network_data = {
