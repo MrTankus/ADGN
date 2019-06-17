@@ -2,8 +2,7 @@ import itertools
 
 
 def sum_square_connectivity_componenet_fitness_function(network):
-
-    return sum(map(lambda cc: len(cc) ** 2, network.graph.get_connectivity_components()))
+    return sum(map(lambda cc: len(cc) ** 2, network.graph.get_connectivity_components())) + len(network.graph.edges) ** 2
 
 
 def avg_on_paths_length_fitness_function(network):

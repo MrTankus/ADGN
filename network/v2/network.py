@@ -11,7 +11,7 @@ class ADGN(object):
 
     def __init__(self, interest_areas, sensors=None):
         self.interest_areas = set(interest_areas)
-        self.graph = DiskGraph(vertices=sensors, radius=1)
+        self.graph = DiskGraph(vertices=sensors, radius=1.3)
         self.relays = set()
 
     @staticmethod
@@ -95,3 +95,7 @@ class ADGN(object):
         vertex = Vertex(random_vertex_id, **data)
         self.graph.add_vertex(vertex)
         self.relays.add(random_vertex_id)
+
+    def remove_relay(self, relay):
+        self.graph.remove_vertex(vertex=relay)
+        relay in self.relays and self.relays.remove(relay)

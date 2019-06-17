@@ -1,24 +1,16 @@
 import datetime
 import hashlib
 import json
-import os
 import uuid
+
+import imageio
+
 from multiprocessing.pool import Pool
 
-if True:
-    from ga.v2.statistics import GAStatistics
-    from network.v2.interest_areas import InterestArea, InterestAreaGenerator
-    from analysis.v2.network_analysis import check_resilience
-    from analysis.v2.fitness_functions import FitnessFunctions
-    from ga.v2.ga import GA
-    from utils.v2.utils import plot_network, plot_statistics, save_network_image
-else:
-    from ga.v1.statistics import GAStatistics
-    from network.v1.interest_areas import InterestArea, InterestAreaGenerator
-    from analysis.v1.network_analysis import check_resilience
-    from analysis.v1.fitness_functions import FitnessFunctions
-    from ga.v1.ga import GA
-    from utils.v1.utils import plot_network, plot_statistics
+from network.v2.interest_areas import InterestArea, InterestAreaGenerator
+from analysis.v2.fitness_functions import FitnessFunctions
+from ga.v2.ga import GA
+from utils.v2.utils import save_network_image
 
 test_interest_areas = [
     InterestArea(center=(0, 0), radius=0.5, name='HUB', is_hub=True),
@@ -33,7 +25,7 @@ test_interest_areas = [
 
 
 def main(*args, **kwargs):
-    run_id = hashlib.sha256(str(uuid.uuid4()).encode()).hexdigest()
+    run_id = hashlib.sha256(str(uuid.uuid4()).encode()).hexdigest()[:8]
     population_size = kwargs.get('initial_population_size')
     generations = kwargs.get('max_generations')
 
@@ -70,39 +62,16 @@ def main(*args, **kwargs):
 
     end = datetime.datetime.now() - start
     print("GA took {} seconds to complete".format(end.total_seconds()))
-    # Fittest member in evolved population
-    fittest_agent = ga.get_fittest()
-    network = fittest_agent.network
-    plot_network(network=ga.initial_fittest.network, title='initial fittest', xlims=kwargs.get('xlims'), ylims=kwargs.get('ylims'))
-    plot_network(network=network, title='final fittest', xlims=kwargs.get('xlims'), ylims=kwargs.get('ylims'))
-
-    # Plotting statistics
-    plot_statistics(statistic=ga.statistics.get(GAStatistics.GEN_FITNESS), name=GAStatistics.GEN_FITNESS)
-    plot_statistics(statistic=ga.statistics.get(GAStatistics.GEN_TIME), name=GAStatistics.GEN_TIME)
-    # plot_statistics(name='Resilience', statistic=check_resilience(network=network),
-    #                 generate_ys=lambda xs: list(map(lambda x: x, xs)))
-
-    if kwargs.get('save', False):
-        print('saving ga and network data')
-        try:
-            dir_name = os.path.join(os.getcwd(), run_id)
-            os.mkdir(dir_name)
-            ga.initial_fittest.network.export(to_file=os.path.join(dir_name, run_id + '_initial.json'))
-            network.export(to_file=os.path.join(dir_name, run_id + '_final.json'))
-            with open(os.path.join(dir_name, run_id + '_metadata.json'), 'w') as metadata_file:
-                d = {
-                    'fitness_function': fitness_function.__name__,
-                    'gens': generations
-                }
-                metadata_file.write(json.dumps(d))
-        except:
-            pass
-    else:
-        print('not saving - finished GA')
+    print("Creating gif of network evolution")
+    images = []
+    for image in ga.gif_images:
+        images.append(imageio.imread(image))
+    imageio.mimsave('simulations/{}/network_evolution.gif'.format(run_id), images, duration=0.2)
+    print("Finished!")
 
 
 if __name__ == '__main__':
-    s = 6.5
+    s = 8
     x_lims = (-s, s)
     y_lims = (-s, s)
     amount_of_interest_areas = 50
@@ -112,4 +81,4 @@ if __name__ == '__main__':
 
     main(initial_population_size=initial_population_size, max_generations=max_generations,
          num_of_interest_reas=amount_of_interest_areas, xlims=x_lims, ylims=y_lims, parallel=False, save=False,
-         load_interest_areas=True)
+         load_interest_areas=False)

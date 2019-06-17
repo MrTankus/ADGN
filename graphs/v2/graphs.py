@@ -1,8 +1,7 @@
 import itertools
-from collections import deque, defaultdict
+from collections import deque
 
 import numpy as np
-from scipy.sparse import coo_matrix
 from geometry.metrics import euclidean_metric
 
 
@@ -84,6 +83,14 @@ class Graph(object):
         self.vertices.add(vertex)
         self.vertices_indices_map[vertex] = size
 
+    def remove_vertex(self, vertex):
+        vertex in self.vertices_indices_map and self.vertices_indices_map.pop(vertex)
+        vertex in self.vertices and self.vertices.remove(vertex)
+        self.adj = self.get_adjacency_matrix()
+        self.paths.clear()
+        self.connectivity_components_map.clear()
+        self.connectivity_components.clear()
+
     def add_edge(self, v1, v2, weight=1):
         v1_index = self.vertices_indices_map.get(v1)
         v2_index = self.vertices_indices_map.get(v2)
@@ -108,9 +115,6 @@ class Graph(object):
 
     def get_adjacency_matrix(self):
         # TODO - implement for sparse matrix
-        # if self.is_sparse:
-        #     adj = coo_matrix((len(self.vertices), len(self.vertices)), dtype=np.float)
-        # else:
         adj = np.zeros(shape=(len(self.vertices), len(self.vertices)), dtype=np.float)
         for edge in self.edges:
             if not self.directed:
@@ -125,6 +129,11 @@ class Graph(object):
             paths[n + 1] = path @ self.adj
             path = paths[n + 1]
         return paths
+
+    def are_neighbors(self, v1, v2):
+        v1_index = self.vertices_indices_map.get(v1)
+        v2_index = self.vertices_indices_map.get(v2)
+        return self.adj[v1_index, v2_index] != 0 or self.adj[v2_index, v1_index] != 0
 
     def get_neighbors(self, vertex):
         neighbors = set()
@@ -157,9 +166,10 @@ class Graph(object):
                 self.connectivity_components_map[v.id] = cc
         return self.connectivity_components
 
-    def get_connectivity_component(self, vertex):
-        if vertex.id in self.connectivity_components_map:
-            return self.connectivity_components_map[vertex.v.id]
+    def get_connectivity_component(self, vertex, without_vertex=None):
+        assert vertex is not without_vertex
+        if without_vertex is not None and vertex.id in self.connectivity_components_map:
+            return self.connectivity_components_map[vertex.id]
         q = deque([], maxlen=len(self.vertices))
         connectivity_component = set()
         visited_vertices = set()
@@ -168,9 +178,16 @@ class Graph(object):
             v = q.popleft()
             connectivity_component.add(v)
             visited_vertices.add(v)
-            connected_vertices = self.get_neighbors(vertex=v) - visited_vertices
+            neighbors = self.get_neighbors(vertex=v)
+            if without_vertex and without_vertex in neighbors:
+                neighbors.remove(without_vertex)
+            connected_vertices = neighbors - visited_vertices
             q.extend(connected_vertices)
         return frozenset(connectivity_component)
+
+    def are_in_the_same_connectivity_component(self, v1, v2):
+        v1_cc = self.connectivity_components_map.get(v1.id)
+        return v1_cc and v2 in v1_cc
 
 
 class DiskGraph(Graph):

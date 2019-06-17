@@ -38,11 +38,27 @@ class GA(object):
         self.initial_fittest = None
         self.run_id = run_id
         self.network_image_saver = network_image_saver
+        self.gif_images = []
         try:
-            dir_name = os.path.join(os.getcwd(), run_id)
-            os.mkdir(dir_name)
+            dir_name = os.path.join(os.getcwd(), 'simulations')
+            os.makedirs('{}/{}/snapshots/'.format(dir_name, run_id))
         except:
             pass
+        self.gen_image_path_format = 'simulations/{}/snapshots/{}.png'
+
+        self.ga_steps = [
+            ("calc fitness", self.calc_fitness),
+            ("selection", self.selection),
+            ("breed", self.breed),
+            ("mutate", self.mutate),
+            #("add relays", self.add_relay),
+        ]
+        self.parallel_ga_steps = [
+            ("calc fitness", self.calc_fitness),
+            ("selection", self.selection),
+            ("breed", self.parallel_breed),
+            ("mutate", self.mutate),
+        ]
 
     def generate_initial_population(self):
         initial_agents = list()
@@ -57,12 +73,15 @@ class GA(object):
 
     def evolve(self, pool=None):
         self.initial_fittest = self.get_fittest()
+
         if pool:
             # Parallel evolution
             for gen in range(self.generations):
                 if self.network_image_saver:
+                    image = self.gen_image_path_format.format(self.run_id, gen)
                     self.network_image_saver(network=self.get_fittest().network, title='Gen {}'.format(gen),
-                                             path='{}/{}.png'.format(self.run_id, gen))
+                                             path=image)
+                    self.gif_images.append(image)
                 start_ga = datetime.datetime.now()
                 print("Starting Generation: " + str(gen))
                 with timer("Generation {}".format(str(gen))):
@@ -76,8 +95,8 @@ class GA(object):
                         self.mutate()
                 gen_time = (datetime.datetime.now() - start_ga).total_seconds()
                 self.statistics.gen_snapshot(gen=gen, time_spent=gen_time)
-            print('Adding relays')
-            self.add_relays()
+            # print('Adding relays')
+            # self.add_relays()
             print('Recalculating fitness')
             self.parallel_calc_fitness(pool=pool)
             print("Finished GA")
@@ -85,28 +104,27 @@ class GA(object):
             # Synchronous evolution
             for gen in range(self.generations):
                 if self.network_image_saver:
+                    image = self.gen_image_path_format.format(self.run_id, gen)
                     self.network_image_saver(network=self.get_fittest().network, title='Gen {}'.format(gen),
-                                             path='{}/{}.png'.format(self.run_id, gen))
+                                             path=image)
+                    self.gif_images.append(image)
                 start_ga = datetime.datetime.now()
                 print("Generation: " + str(gen))
                 with timer("Generation {}".format(str(gen))):
-                    with timer("calc fitness"):
-                        self.calc_fitness()
-                    with timer("selection"):
-                        self.selection()
-                    with timer("breed"):
-                        self.breed()
-                    with timer("mutate"):
-                        self.mutate()
+                    for phase in self.ga_steps:
+                        with timer(phase[0]):
+                            phase[1]()
                 gen_time = (datetime.datetime.now() - start_ga).total_seconds()
                 self.statistics.gen_snapshot(gen=gen, time_spent=gen_time)
-            print('Adding relays')
-            self.add_relays()
+            # print('Adding relays')
+            # self.add_relays()
             print('Recalculating fitness')
             self.calc_fitness()
             if self.network_image_saver:
+                image = self.gen_image_path_format.format(self.run_id, self.generations)
                 self.network_image_saver(network=self.get_fittest().network, title='Gen {}'.format(self.generations),
-                                         path='{}/{}.png'.format(self.run_id, self.generations))
+                                         path=image)
+                self.gif_images.append(image)
             print("Finished GA")
 
     def parallel_calc_fitness(self, pool):
@@ -116,16 +134,16 @@ class GA(object):
             if agent:
                 agent.fitness = fitness
 
-    def calc_fitness(self):
+    def calc_fitness(self, *args, **kwargs):
         for agent in self.agents:
             agent.fitness = self.fitness_function(network=agent.network)
             self.fittest_agent = agent if self.fittest_agent is None or self.fittest_agent.fitness < agent.fitness else self.fittest_agent
 
-    def selection(self):
+    def selection(self, *args, **kwargs):
         selected_agents = sorted(self.agents, key=lambda agent: agent.fitness, reverse=True)
         self.agents = selected_agents[:self.initial_population_size]
 
-    def parallel_breed(self, pool):
+    def parallel_breed(self, pool, *args, **kwargs):
         all_agents = set(self.agents)
         random_parents = list()
         while len(all_agents) > 1:
@@ -144,7 +162,7 @@ class GA(object):
             self.agents.append(a1)
             self.agents.append(a2)
 
-    def breed(self):
+    def breed(self, *args, **kwargs):
         all_agents = set(self.agents)
         offsprings = set()
         while len(all_agents) > 1:
@@ -173,18 +191,32 @@ class GA(object):
             offsprings.add(Agent(network=second_born))
         self.agents.extend(offsprings)
 
-    def mutate(self):
+    def mutate(self, *args, **kwargs):
         for agent in self.agents:
             network = agent.network
             random_node = network.get_random_sensor(include_relays=False)
             network.move_sensor(random_node)
 
-    def add_relays(self):
+    def add_relay(self):
         for agent in self.agents:
             network = agent.network
+            # # Remove unnecessary relays
+            current_relays = set(network.relays)
+            for relay in current_relays:
+                relay_cc = set(network.graph.get_connectivity_component(vertex=relay))
+                relay_cc.remove(relay)
+                for vertex in relay_cc:
+                    v_cc = network.graph.get_connectivity_component(vertex=vertex, without_vertex=relay)
+                    if v_cc == relay_cc:
+                        network.remove_relay(relay)
+                        break
+
             connectivity_components = set(network.graph.get_connectivity_components())
             connectivity_component_pairs = set(itertools.combinations(connectivity_components, 2))
-            intersecting_connectivity_components = set(filter(lambda pair: network.get_connectivity_components_halos_intersections(cc1=pair[0], cc2=pair[1]), connectivity_component_pairs))
+            intersecting_connectivity_components = set(
+                filter(lambda pair: network.get_connectivity_components_halos_intersections(cc1=pair[0], cc2=pair[1]),
+                       connectivity_component_pairs))
+
             visited_components = set()
             if intersecting_connectivity_components:
                 for cc1, cc2 in intersecting_connectivity_components:
@@ -194,6 +226,23 @@ class GA(object):
                     network.add_relay(location=relay_location)
                     visited_components.add(cc1)
                     visited_components.add(cc2)
+
+
+    # def add_relays(self):
+    #     for agent in self.agents:
+    #         network = agent.network
+    #         connectivity_components = set(network.graph.get_connectivity_components())
+    #         connectivity_component_pairs = set(itertools.combinations(connectivity_components, 2))
+    #         intersecting_connectivity_components = set(filter(lambda pair: network.get_connectivity_components_halos_intersections(cc1=pair[0], cc2=pair[1]), connectivity_component_pairs))
+    #         visited_components = set()
+    #         if intersecting_connectivity_components:
+    #             for cc1, cc2 in intersecting_connectivity_components:
+    #                 halo_intersecting_circles = network.get_connectivity_components_halos_intersections(cc1=cc1, cc2=cc2)
+    #                 intersecting_circles = random.choice(list(halo_intersecting_circles))
+    #                 _, relay_location = Circle.get_point_in_intersection(intersecting_circles)
+    #                 network.add_relay(location=relay_location)
+    #                 visited_components.add(cc1)
+    #                 visited_components.add(cc2)
 
     def get_fittest(self):
         fittest = None
