@@ -5,12 +5,11 @@ import uuid
 
 import imageio
 
-from multiprocessing.pool import Pool
-
+from ga.v2.statistics import GAStatistics
 from network.v2.interest_areas import InterestArea, InterestAreaGenerator
 from analysis.v2.fitness_functions import FitnessFunctions
 from ga.v2.ga import GA
-from utils.v2.utils import save_network_image
+from utils.v2.utils import save_network_image, save_statistics
 
 test_interest_areas = [
     InterestArea(center=(0, 0), radius=0.5, name='HUB', is_hub=True),
@@ -25,7 +24,9 @@ test_interest_areas = [
 
 
 def main(*args, **kwargs):
-    run_id = hashlib.sha256(str(uuid.uuid4()).encode()).hexdigest()[:8]
+    fitness_function_name = FitnessFunctions.AVG_PATH_LENGTH
+    elite = False
+    run_id = '{}_{}_{}'.format('elite' if elite else 'standard', fitness_function_name, hashlib.sha256(str(uuid.uuid4()).encode()).hexdigest()[:8])
     population_size = kwargs.get('initial_population_size')
     generations = kwargs.get('max_generations')
 
@@ -47,18 +48,15 @@ def main(*args, **kwargs):
             ]))
 
     # GA - will always mutate (mutation factor = 1)
-    fitness_function = FitnessFunctions.get_fitness_function(FitnessFunctions.SUM_SQUARE_CC_SIZE)
+    fitness_function = FitnessFunctions.get_fitness_function(fitness_function_name)
     ga = GA(interest_areas=interest_areas, initial_population_size=population_size, generations=generations,
-            fitness_function=fitness_function, mutation_factor=1, network_image_saver=save_network_image, run_id=run_id)
+            fitness_function=fitness_function, mutation_factor=1, network_image_saver=save_network_image, run_id=run_id,
+            elite=elite)
 
     ga.generate_initial_population()
     start = datetime.datetime.now()
 
-    if kwargs.get('parallel', False):
-        with Pool() as pool:
-            ga.evolve(pool=pool)
-    else:
-        ga.evolve()
+    ga.evolve()
 
     end = datetime.datetime.now() - start
     print("GA took {} seconds to complete".format(end.total_seconds()))
@@ -67,6 +65,10 @@ def main(*args, **kwargs):
     for image in ga.gif_images:
         images.append(imageio.imread(image))
     imageio.mimsave('simulations/{}/network_evolution.gif'.format(run_id), images, duration=0.2)
+
+    save_statistics(GAStatistics.GEN_FITNESS, ga.statistics.get(GAStatistics.GEN_FITNESS),
+                    path='simulations/{}/{}.png'.format(run_id, GAStatistics.GEN_FITNESS))
+
     print("Finished!")
 
 
@@ -77,8 +79,13 @@ if __name__ == '__main__':
     amount_of_interest_areas = 50
 
     initial_population_size = 20
-    max_generations = 500
+    max_generations = 750
+    ga_iterations = 3
 
-    main(initial_population_size=initial_population_size, max_generations=max_generations,
-         num_of_interest_reas=amount_of_interest_areas, xlims=x_lims, ylims=y_lims, parallel=False, save=False,
-         load_interest_areas=False)
+    for _ in range(ga_iterations):
+        print('================================ STARTING {} RUN ================================'.format(_))
+        main(initial_population_size=initial_population_size, max_generations=max_generations,
+             num_of_interest_reas=amount_of_interest_areas, xlims=x_lims, ylims=y_lims, save=False,
+             load_interest_areas=True)
+        print('================================ FINISHED {} RUN ================================'.format(_))
+

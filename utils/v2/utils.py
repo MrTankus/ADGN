@@ -82,9 +82,9 @@ def save_network_image(network, title, path):
     plt.close('all')
 
 
-def plot_statistics(name, statistic, generate_ys=None):
+def save_statistics(name, statistic, path, generate_ys=None):
     if statistic:
-        plt.figure(name)
+        fig = plt.figure(name)
         ax = plt.gca()
         xs = list(map(lambda p: p[0], statistic))
         ys = list(map(lambda p: p[1], statistic))
@@ -92,7 +92,9 @@ def plot_statistics(name, statistic, generate_ys=None):
         if generate_ys:
             ax.scatter(xs, generate_ys(xs), s=5, c='black', alpha=1)
         ax.set_title(name)
-        plt.show()
+        fig.savefig(path)
+        plt.close(fig)
+        plt.close('all')
     else:
         print("No statistic with name {} was found".format(name))
 
