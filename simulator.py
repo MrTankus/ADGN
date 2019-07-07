@@ -17,14 +17,13 @@ test_interest_areas = [
     InterestArea(center=(2, 0), radius=0.5, name='Omeg2'),
     InterestArea(center=(1, -0.5), radius=0.5, name='Omega3'),
     InterestArea(center=(2, -1.8), radius=0.5, name='Omega4'),
-
     InterestArea(center=(5, 4), radius=0.5, name='Omega5'),
     InterestArea(center=(3.5, 4.1), radius=0.5, name='Omega6'),
 ]
 
 
 def main(*args, **kwargs):
-    fitness_function_name = FitnessFunctions.AVG_PATH_LENGTH
+    fitness_function_name = FitnessFunctions.HARMONIC_AVG_PATH_LENGTH
     elite = False
     run_id = '{}_{}_{}'.format('elite' if elite else 'standard', fitness_function_name, hashlib.sha256(str(uuid.uuid4()).encode()).hexdigest()[:8])
     population_size = kwargs.get('initial_population_size')
@@ -51,7 +50,7 @@ def main(*args, **kwargs):
     fitness_function = FitnessFunctions.get_fitness_function(fitness_function_name)
     ga = GA(interest_areas=interest_areas, initial_population_size=population_size, generations=generations,
             fitness_function=fitness_function, mutation_factor=1, network_image_saver=save_network_image, run_id=run_id,
-            elite=elite)
+            optimum=FitnessFunctions.get_fitness_function_optimum(fitness_function_name))
 
     ga.generate_initial_population()
     start = datetime.datetime.now()

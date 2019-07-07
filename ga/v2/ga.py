@@ -6,6 +6,7 @@ import os
 import uuid
 import random
 
+from analysis.v2.fitness_functions import Optimum
 from ga.v2.statistics import GAStatistics
 from geometry.shapes import Circle
 from network.v2.network import ADGN
@@ -26,7 +27,7 @@ class Agent(object):
 class GA(object):
 
     def __init__(self, interest_areas, initial_population_size, generations, fitness_function, mutation_factor=0.8,
-                 run_id=None, network_image_saver=None, elite=False):
+                 run_id=None, network_image_saver=None, optimum=Optimum.MAX):
         self.interest_areas = interest_areas
         self.initial_population_size = initial_population_size
         self.fitness_function = fitness_function
@@ -53,8 +54,7 @@ class GA(object):
             ("breed", self.breed),
             ("mutate", self.mutate),
         ]
-        self.elite = elite
-        print('GA using elite varient: {}'.format(self.elite))
+        self.optimum = optimum
 
     def generate_initial_population(self):
         initial_agents = list()
@@ -101,7 +101,7 @@ class GA(object):
             self.fittest_agent = agent if self.fittest_agent is None or self.fittest_agent.fitness < agent.fitness else self.fittest_agent
 
     def selection(self, *args, **kwargs):
-        selected_agents = sorted(self.agents, key=lambda agent: agent.fitness, reverse=True)
+        selected_agents = sorted(self.agents, key=lambda agent: agent.fitness, reverse=self.optimum == Optimum.MAX)
         self.agents = selected_agents[:self.initial_population_size]
 
     def breed(self, *args, **kwargs):
@@ -134,8 +134,7 @@ class GA(object):
         self.agents.extend(offsprings)
 
     def mutate(self, *args, **kwargs):
-        agents_to_mutate = self.agents[math.ceil(0.5 * len(self.agents)):] if self.elite else self.agents
-        for agent in agents_to_mutate:
+        for agent in self.agents:
             network = agent.network
             random_node = network.get_random_sensor(include_relays=False)
             network.move_sensor(random_node)
@@ -159,6 +158,11 @@ class GA(object):
     def get_fittest(self):
         fittest = None
         for agent in self.agents:
-            fittest = agent if fittest is None or fittest.fitness < agent.fitness else fittest
+            if fittest is None:
+                fittest = agent
+            elif self.optimum == Optimum.MAX and fittest.fitness < agent.fitness:
+                fittest = agent
+            elif not self.optimum == Optimum.MIN and fittest.fitness > agent.fitness > 0:
+                fittest = agent
         return fittest
 
