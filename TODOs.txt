@@ -1,5 +1,0 @@
-1) generate graph gif from fittest per generation
-2) mutation
-    2.1) add / remove / move relay
-    2.2) change halo of vertex
-3)

@@ -1,0 +1,34 @@
+{
+  "$id": "https://example.com/person.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Interest Areas",
+  "type": "array",
+  "uniqueItems": true,
+  "minItems": 1,
+  "items": {
+      "$ref": "#/definitions/interest_area"
+  },
+  "definitions": {
+    "interest_area": {
+      "type": "object",
+      "required": [ "center", "radius" ],
+      "properties": {
+        "center": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "number"
+          },
+          "description": "the coordinates of the center of the interest area"
+        },
+        "radius": {
+          "type": "number",
+          "description": "the radius of the interest area"
+        },
+        "is_hub": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

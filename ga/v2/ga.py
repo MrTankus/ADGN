@@ -1,12 +1,11 @@
 import datetime
 import hashlib
-import math
+import imageio
 import itertools
-import os
+import json
 import uuid
 import random
 
-from analysis.v2.fitness_functions import Optimum
 from ga.v2.statistics import GAStatistics
 from geometry.shapes import Circle
 from network.v2.network import ADGN
@@ -23,11 +22,23 @@ class Agent(object):
     def __lt__(self, other):
         return self.fitness > other.fitness
 
+    def as_json_dict(self):
+        return {
+            'agent_id': self.agent_id,
+            'fitness': self.fitness,
+            'network': self.network.as_json_dict()
+        }
+
+    @classmethod
+    def from_json(cls, agent_json):
+        agent_dict = json.loads(agent_json)
+        return agent_dict['agent_id'], ADGN.from_json(agent_dict['network'])
+
 
 class GA(object):
 
-    def __init__(self, interest_areas, initial_population_size, generations, fitness_function, mutation_factor=0.8,
-                 run_id=None, network_image_saver=None, optimum=Optimum.MAX):
+    def __init__(self, interest_areas, initial_population_size, generations, fitness_function, optimum, mutation_factor=0.8,
+                 run_id=None):
         self.interest_areas = interest_areas
         self.initial_population_size = initial_population_size
         self.fitness_function = fitness_function
@@ -39,14 +50,7 @@ class GA(object):
         self.fittest_agent = None
         self.initial_fittest = None
         self.run_id = run_id
-        self.network_image_saver = network_image_saver
-        self.gif_images = []
-        try:
-            dir_name = os.path.join(os.getcwd(), 'simulations')
-            os.makedirs('{}/{}/snapshots/'.format(dir_name, run_id))
-        except:
-            pass
-        self.gen_image_path_format = 'simulations/{}/snapshots/{}.png'
+        self.networks_for_visualization = []
 
         self.ga_steps = [
             ("calc fitness", self.calc_fitness),
@@ -62,58 +66,58 @@ class GA(object):
             network = ADGN(interest_areas=self.interest_areas)
             network.randomize()
             agent = Agent(network=network)
-            agent.fitness = self.fitness_function(network=agent.network)
+            _, agent.fitness = self.fitness_function(agent=agent)
             initial_agents.append(agent)
             self.agent_mapping[agent.agent_id] = agent
         self.agents = initial_agents
 
-    def evolve(self):
+    def evolve(self, logger):
         self.initial_fittest = self.get_fittest()
-        # Synchronous evolution
-        for gen in range(self.generations):
-            if self.network_image_saver:
-                image = self.gen_image_path_format.format(self.run_id, gen)
-                self.network_image_saver(network=self.get_fittest().network, title='Gen {}'.format(gen),
-                                         path=image)
-                self.gif_images.append(image)
+        self.networks_for_visualization = []
+        gen_image_path_format = '{}/snapshots/{}.png'
+        image = gen_image_path_format.format(self.run_id, 'initial')
+        self.networks_for_visualization.append((self.initial_fittest.network.as_json_dict(), 'Gen {}'.format('initial'), image))
+
+        for gen in range(1, self.generations):
             start_ga = datetime.datetime.now()
-            print("Generation: " + str(gen))
-            with timer("Generation {}".format(str(gen))):
+            logger.info("Generation: " + str(gen))
+            with timer("Generation {}".format(str(gen)), logger=logger):
                 for phase in self.ga_steps:
-                    with timer(phase[0]):
+                    with timer(phase[0], logger=logger):
                         phase[1]()
             gen_time = (datetime.datetime.now() - start_ga).total_seconds()
             self.statistics.gen_snapshot(gen=gen, time_spent=gen_time)
-        print('Adding relays')
+            image = gen_image_path_format.format(self.run_id, gen)
+            network_visualization_info = (self.get_fittest().network.as_json_dict(), 'Gen {}'.format(gen), image)
+            self.networks_for_visualization.append(network_visualization_info)
+
+        logger.info('Adding relays')
         self.add_relays()
-        print('Recalculating fitness')
+        logger.info('Recalculating fitness')
         self.calc_fitness()
-        if self.network_image_saver:
-            image = self.gen_image_path_format.format(self.run_id, self.generations)
-            self.network_image_saver(network=self.get_fittest().network, title='Gen {}'.format(self.generations),
-                                     path=image)
-            self.gif_images.append(image)
-        print("Finished GA")
+        image = gen_image_path_format.format(self.run_id, self.generations)
+        network_visualization_info = (self.get_fittest().network.as_json_dict(), 'Gen {}'.format(self.generations), image)
+        self.networks_for_visualization.append(network_visualization_info)
+        logger.info("Finished GA")
 
     def calc_fitness(self, *args, **kwargs):
         for agent in self.agents:
-            agent.fitness = self.fitness_function(network=agent.network)
+            _, agent.fitness = self.fitness_function(agent=agent)
             self.fittest_agent = agent if self.fittest_agent is None or self.fittest_agent.fitness < agent.fitness else self.fittest_agent
 
     def selection(self, *args, **kwargs):
+        from analysis.v2.fitness_functions import Optimum
         selected_agents = sorted(self.agents, key=lambda agent: agent.fitness, reverse=self.optimum == Optimum.MAX)
         self.agents = selected_agents[:self.initial_population_size]
 
     def breed(self, *args, **kwargs):
-        all_agents = set(self.agents)
+        all_agents = list(self.agents)
         offsprings = set()
         while len(all_agents) > 1:
-            couple = random.sample(all_agents, 2)
-            while len(couple) < 2:
-                couple = random.sample(all_agents, 2)
-            a1 = couple[0]
-            a2 = couple[1]
+
+            a1 = random.choice(all_agents)
             all_agents.remove(a1)
+            a2 = random.choice(all_agents)
             all_agents.remove(a2)
 
             all_a1_nodes = list(a1.network.graph.vertices)
@@ -136,8 +140,11 @@ class GA(object):
     def mutate(self, *args, **kwargs):
         for agent in self.agents:
             network = agent.network
-            random_node = network.get_random_sensor(include_relays=False)
-            network.move_sensor(random_node)
+            # range(random.randint(1, len(network.graph.vertices)))
+            for i in range(10):
+                if random.random() <= self.mutation_factor:
+                    random_node = network.get_random_sensor(include_relays=False)
+                    network.move_sensor(random_node)
 
     def add_relays(self):
         for agent in self.agents:
@@ -156,6 +163,7 @@ class GA(object):
                     visited_components.add(cc2)
 
     def get_fittest(self):
+        from analysis.v2.fitness_functions import Optimum
         fittest = None
         for agent in self.agents:
             if fittest is None:
@@ -166,3 +174,32 @@ class GA(object):
                 fittest = agent
         return fittest
 
+    def generate_evolution_visualization(self, network_image_saver, output_dir):
+        if network_image_saver:
+            images_for_visualization = []
+            for network_visualization_info in self.networks_for_visualization:
+                network = ADGN.from_json(network_visualization_info[0])
+                title = network_visualization_info[1]
+                image_path = '{}/{}'.format(output_dir, network_visualization_info[2])
+                network_image_saver(network, title, image_path)
+                images_for_visualization.append(imageio.imread(image_path))
+            imageio.mimsave('{}/{}/network_evolution.gif'.format(output_dir, self.run_id), images_for_visualization,
+                            duration=0.2)
+
+
+class ParallelGA(GA):
+
+    def __init__(self, interest_areas, initial_population_size, generations, fitness_function, optimum, pool, mutation_factor=0.8,
+                 run_id=None):
+
+        super(ParallelGA, self).__init__(interest_areas=interest_areas, initial_population_size=initial_population_size,
+                                         generations=generations, fitness_function=fitness_function, optimum=optimum,
+                                         mutation_factor=mutation_factor, run_id=run_id)
+        self.pool = pool
+
+    def calc_fitness(self, *args, **kwargs):
+        for res in self.pool.map(self.fitness_function, [json.dumps(agent.as_json_dict()) for agent in self.agents]):
+            agent = self.agent_mapping.get(res[0])
+            if agent:
+                agent.fitness = res[1]
+                self.fittest_agent = agent if self.fittest_agent is None or self.fittest_agent.fitness < agent.fitness else self.fittest_agent

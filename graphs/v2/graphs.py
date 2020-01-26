@@ -29,6 +29,19 @@ class Vertex(object):
     def __repr__(self):
         return "Vertex [id: " + str(self.id) + "]"
 
+    def as_json_dict(self):
+        res = {
+            'id': self.id,
+            'location': self.get('location'),
+            'is_relay': self.get('is_relay', False)
+        }
+        return res
+
+    @classmethod
+    def from_json(cls, vertex_json):
+        location = tuple(vertex_json.get('location')) if vertex_json.get('location') else None
+        return Vertex(vertex_json['id'], location=location, is_relay=vertex_json.get('is_relay', False))
+
 
 class Edge(object):
 
@@ -46,13 +59,16 @@ class Edge(object):
         else:
             if other.directed:
                 return False
-            return (self.v1 == other.v1 and self.v2 == other.v2) or (self.v1 == other.v2 and self.v2 == other.v2)
+            return self.is_on_edge(vertex=other.v1) and self.is_on_edge(vertex=other.v2)
 
     def __hash__(self):
         if self.directed:
             return hash((self.v1, self.v2))
         else:
             return hash(frozenset([self.v1, self.v2]))
+
+    def is_on_edge(self, vertex):
+        return self.v1 == vertex or self.v2 == vertex
 
 
 class Graph(object):
@@ -88,6 +104,8 @@ class Graph(object):
         vertex in self.vertices and self.vertices.remove(vertex)
         self.adj = self.get_adjacency_matrix()
         self.paths.clear()
+        edges_to_be_removed = set(filter(lambda edge: edge.is_on_edge(vertex=vertex), self.edges))
+        self.edges = self.edges - edges_to_be_removed
         self.connectivity_components_map.clear()
         self.connectivity_components.clear()
 
@@ -114,7 +132,6 @@ class Graph(object):
         self.connectivity_components.clear()
 
     def get_adjacency_matrix(self):
-        # TODO - implement for sparse matrix
         adj = np.zeros(shape=(len(self.vertices), len(self.vertices)), dtype=np.float)
         for edge in self.edges:
             if not self.directed:
@@ -171,19 +188,19 @@ class Graph(object):
         if without_vertex is not None and vertex.id in self.connectivity_components_map:
             return self.connectivity_components_map[vertex.id]
         q = deque([], maxlen=len(self.vertices))
-        connectivity_component = set()
+        vertices_in_cc = set()
         visited_vertices = set()
         q.append(vertex)
         while len(q) > 0:
             v = q.popleft()
-            connectivity_component.add(v)
+            vertices_in_cc.add(v)
             visited_vertices.add(v)
             neighbors = self.get_neighbors(vertex=v)
             if without_vertex and without_vertex in neighbors:
                 neighbors.remove(without_vertex)
             connected_vertices = neighbors - visited_vertices
             q.extend(connected_vertices)
-        return frozenset(connectivity_component)
+        return frozenset(vertices_in_cc)
 
     def are_in_the_same_connectivity_component(self, v1, v2):
         v1_cc = self.connectivity_components_map.get(v1.id)
@@ -207,8 +224,8 @@ class DiskGraph(Graph):
         vertex.set('halo', self.radius)
         super(DiskGraph, self).add_vertex(vertex=vertex)
         near_vertices = filter(lambda v: 0 < self.metric(p1=v.get('location'), p2=vertex.get('location')) <= self.radius, self.vertices)
-        for v in near_vertices:
-            self.add_edge(v, vertex)
+        for near_vertex in near_vertices:
+            self.add_edge(near_vertex, vertex)
 
     def add_edge(self, v1, v2, weight=1):
         if self.metric(p1=v1.get('location'), p2=v2.get('location')) <= self.radius:
@@ -227,4 +244,17 @@ class DiskGraph(Graph):
 
         for v in near_vertices:
             super(DiskGraph, self).add_edge(v1=v, v2=vertex)
+
+    def as_json_dict(self):
+        res = {
+            'radius': self.radius,
+            'vertices': [v.as_json_dict() for v in self.vertices]
+        }
+        return res
+
+    @classmethod
+    def from_json(cls, graph_json):
+        vertices = {Vertex.from_json(vertex_json) for vertex_json in graph_json.get('vertices')}
+        radius = graph_json.get('radius')
+        return DiskGraph(vertices=vertices, radius=radius)
 

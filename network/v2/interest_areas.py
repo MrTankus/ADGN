@@ -1,3 +1,5 @@
+import hashlib
+import uuid
 import json
 import random
 from geometry.shapes import Circle
@@ -18,6 +20,10 @@ class InterestArea(Circle):
             'is_hub': self.is_hub
         }
 
+    @classmethod
+    def from_json(cls, ia_json):
+        return InterestArea(center=tuple(ia_json['center']), radius=ia_json['radius'], name=ia_json['name'], is_hub=ia_json['is_hub'])
+
 
 class InterestAreaGenerator(object):
 
@@ -28,11 +34,18 @@ class InterestAreaGenerator(object):
             json_string = file.read()
             if json_string:
                 ias_list = json.loads(json_string)
+                hub_count = 0
                 for ia_dict in ias_list:
+                    is_hub = ia_dict.get('is_hub', False)
+                    if is_hub:
+                        hub_count += 1
+                        ia_name = 'HUB_' + str(hub_count)
+                    else:
+                        ia_name = ia_dict.get('name', hashlib.sha256(str(uuid.uuid4()).encode()).hexdigest()[:6])
                     interest_areas.add(InterestArea(center=tuple(ia_dict['center']),
                                                     radius=ia_dict['radius'],
-                                                    name=ia_dict['name'],
-                                                    is_hub=ia_dict['is_hub']))
+                                                    name=ia_name,
+                                                    is_hub=is_hub))
         return interest_areas
 
     @classmethod

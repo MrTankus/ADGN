@@ -1,3 +1,4 @@
+import argparse
 import datetime
 from contextlib import contextmanager
 
@@ -116,11 +117,25 @@ def plot_interest_areas(interest_areas, xlims, ylims):
     plt.show()
 
 
+def str2bool(v):
+    if isinstance(v, bool):
+        return v
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
+
 @contextmanager
-def timer(op_name):
+def timer(op_name, logger=None):
     start = datetime.datetime.now()
     try:
         yield
     finally:
         end = datetime.datetime.now()
-        print("Operation: {} took {} seconds".format(op_name, (end - start).total_seconds()))
+        message = "Operation: {} took {} seconds".format(op_name, (end - start).total_seconds())
+        if logger:
+            logger.info(message)
+        else:
+            print(message)

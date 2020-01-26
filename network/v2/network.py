@@ -5,14 +5,30 @@ import random
 
 from geometry.shapes import Circle
 from graphs.v2.graphs import Vertex, DiskGraph
+from network.v2.interest_areas import InterestArea
 
 
 class ADGN(object):
 
     def __init__(self, interest_areas, sensors=None):
         self.interest_areas = set(interest_areas)
-        self.graph = DiskGraph(vertices=sensors, radius=1.3)
+        self.graph = DiskGraph(vertices=sensors, radius=1)
         self.relays = set()
+
+    def as_json_dict(self):
+        res = {
+            'interest_areas': [ia.as_json_dict() for ia in self.interest_areas],
+            'graph': self.graph.as_json_dict(),
+        }
+        return res
+
+    @classmethod
+    def from_json(cls, network_json):
+        interest_areas = {InterestArea.from_json(ia_json) for ia_json in network_json['interest_areas']}
+        graph = DiskGraph.from_json(network_json['graph'])
+        adgn = ADGN(interest_areas=interest_areas, sensors=graph.vertices)
+        adgn.relays = set(filter(lambda v: v.get('is_relay'), graph.vertices))
+        return adgn
 
     @staticmethod
     def generate_random_sensor_location(interest_area, mid_center=False):
@@ -60,13 +76,13 @@ class ADGN(object):
 
     def get_random_sensor(self, include_relays=True):
         if include_relays:
-            return random.choice(self.graph.vertices)
+            return self.graph.vertices.pop()
         else:
-            relays = list(filter(lambda sensor: not sensor.get('is_relay', False), self.graph.vertices))
+            relays = set(filter(lambda sensor: not sensor.get('is_relay', False), self.graph.vertices))
             if relays:
-                return random.choice(relays)
+                return relays.pop()
             else:
-                return random.choice(list(self.graph.vertices))
+                return self.graph.vertices.pop()
 
     def get_connectivity_components_halos_intersections(self, cc1, cc2):
 
