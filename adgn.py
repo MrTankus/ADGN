@@ -50,24 +50,25 @@ def main():
 
     logger.info('creating initial population of size %s', args.initial_population)
     with timer(op_name='evolution', logger=logger):
-        if not args.parallel:
-            logger.info("starting GA process (%s) synchronously", run_id)
-            ga = GA(interest_areas=interest_areas, initial_population_size=args.initial_population,
-                    generations=args.generations, fitness_function=fitness_function,
-                    optimum=FitnessFunctions.get_fitness_function_optimum(args.fitness_function),
-                    mutation_factor=args.mutation_factor, run_id=run_id)
-            ga.generate_initial_population()
-            ga.evolve(logger=logger)
-        else:
+        if args.parallel:
             logger.info("starting GA process (%s) asynchronously", run_id)
             from multiprocessing.pool import Pool
             with Pool() as pool:
                 ga = ParallelGA(interest_areas=interest_areas, initial_population_size=args.initial_population,
                                 generations=args.generations, fitness_function=fitness_function,
                                 optimum=FitnessFunctions.get_fitness_function_optimum(args.fitness_function), pool=pool,
-                                mutation_factor=args.mutation_factor, run_id=run_id,)
+                                mutation_factor=args.mutation_factor, run_id=run_id)
                 ga.generate_initial_population()
                 ga.evolve(logger=logger)
+        else:
+            logger.info("starting GA process (%s) synchronously", run_id)
+            ga = GA(interest_areas=interest_areas, initial_population_size=args.initial_population,
+                    generations=args.generations, fitness_function=fitness_function,
+                    optimum=FitnessFunctions.get_fitness_function_optimum(args.fitness_function),
+                    mutation_factor=args.mutation_factor, run_id=run_id)
+
+            ga.generate_initial_population()
+            ga.evolve(logger=logger)
 
     create_ga_process_files(ga=ga, output_dir=args.output_dir, visualize_ga=args.visualize)
     logger.info('Finished GA process')

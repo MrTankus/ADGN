@@ -108,6 +108,7 @@ class GA(object):
         from analysis.v2.fitness_functions import Optimum
         selected_agents = sorted(self.agents, key=lambda agent: agent.fitness, reverse=self.optimum == Optimum.MAX)
         self.agents = selected_agents[:self.initial_population_size]
+        self.agent_mapping = dict(map(lambda agent: (agent.agent_id, agent), self.agents))
 
     def breed(self, *args, **kwargs):
         all_agents = list(self.agents)
@@ -139,11 +140,9 @@ class GA(object):
     def mutate(self, *args, **kwargs):
         for agent in self.agents:
             network = agent.network
-            # range(random.randint(1, len(network.graph.vertices)))
-            for i in range(10):
-                if random.random() <= self.mutation_factor:
-                    random_node = network.get_random_sensor(include_relays=False)
-                    network.move_sensor(random_node)
+            if random.random() <= self.mutation_factor:
+                random_node = network.get_random_sensor(include_relays=False)
+                network.move_sensor(random_node)
 
     def add_relays(self):
         relevant_agents = set(filter(lambda t: len(t[1]) > 0, map(lambda agent: (agent, agent.network.get_intersecting_connectivity_components()), self.agents)))

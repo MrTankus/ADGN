@@ -77,13 +77,12 @@ class ADGN(object):
 
     def get_random_sensor(self, include_relays=True):
         if include_relays:
-            return self.graph.vertices.pop()
+            return random.sample(self.graph.vertices, 1)[0]
         else:
-            relays = set(filter(lambda sensor: not sensor.get('is_relay', False), self.graph.vertices))
-            if relays:
-                return relays.pop()
-            else:
-                return self.graph.vertices.pop()
+            non_relays = set(filter(lambda sensor: not sensor.get('is_relay', False), self.graph.vertices))
+            if non_relays:
+                return random.sample(non_relays, 1)[0]
+            return None
 
     @staticmethod
     def get_connectivity_components_halos_intersections(cc1, cc2):
