@@ -1,4 +1,5 @@
 import hashlib
+import itertools
 import math
 import uuid
 import random
@@ -15,10 +16,10 @@ class ADGN(object):
         self.graph = DiskGraph(vertices=sensors, radius=1)
         self.relays = set()
 
-    def as_json_dict(self):
+    def as_json_dict(self, *args, **kwargs):
         res = {
             'interest_areas': [ia.as_json_dict() for ia in self.interest_areas],
-            'graph': self.graph.as_json_dict(),
+            'graph': self.graph.as_json_dict(with_edges=True),
         }
         return res
 
@@ -84,7 +85,8 @@ class ADGN(object):
             else:
                 return self.graph.vertices.pop()
 
-    def get_connectivity_components_halos_intersections(self, cc1, cc2):
+    @staticmethod
+    def get_connectivity_components_halos_intersections(cc1, cc2):
 
         def get_vertex_halo(v):
             return Circle(center=v.get('location'), radius=v.get('halo'))
@@ -101,6 +103,12 @@ class ADGN(object):
                     intersecting_circles.add((c1, c2))
         return intersecting_circles
 
+    def get_intersecting_connectivity_components(self):
+        intersecting_connectivity_components = set(
+            filter(lambda pair: self.get_connectivity_components_halos_intersections(cc1=pair[0], cc2=pair[1]),
+                   itertools.combinations(self.graph.get_connectivity_components(), 2)))
+        return frozenset(intersecting_connectivity_components)
+
     def add_relay(self, location, *args, **kwargs):
         random_vertex_id = hashlib.sha256(str(uuid.uuid4()).encode()).hexdigest()
         data = {
@@ -111,7 +119,3 @@ class ADGN(object):
         vertex = Vertex(random_vertex_id, **data)
         self.graph.add_vertex(vertex)
         self.relays.add(random_vertex_id)
-
-    def remove_relay(self, relay):
-        self.graph.remove_vertex(vertex=relay)
-        relay in self.relays and self.relays.remove(relay)

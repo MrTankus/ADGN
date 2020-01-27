@@ -17,7 +17,3 @@ def breed_networks(n1, n2, interest_areas):
     offspring2 = ADGN(interest_areas=interest_areas,
                       sensors=set(map(lambda n: n.clone(), n2_partial_data.union(n1_compliment_data))))
     return offspring1, offspring2
-
-
-def calc_fitness(agent_id, network, fitness_func):
-    return agent_id, fitness_func(network=network)

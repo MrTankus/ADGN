@@ -12,7 +12,7 @@ class InterestArea(Circle):
         self.name = name
         self.is_hub = is_hub
 
-    def as_json_dict(self):
+    def as_json_dict(self, *args, **kwargs):
         return {
             'name': self.name,
             'center': self.center,

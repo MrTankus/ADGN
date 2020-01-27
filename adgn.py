@@ -14,13 +14,12 @@ from ga.v2.statistics import GAStatistics
 from network.v2.interest_areas import InterestAreaGenerator
 from utils.v2.utils import timer, save_statistics, save_network_image, str2bool
 
-logger = logging.getLogger('AGDN')
 formatter = logging.Formatter('%(asctime)s %(levelname)s: %(message)s')
 handler = logging.StreamHandler(stdout)
 handler.setFormatter(formatter)
+logger = logging.getLogger('AGDN')
 logger.setLevel(logging.INFO)
 logger.addHandler(handler)
-
 
 def main():
     parser = argparse.ArgumentParser(description='Create an optimized adhoc sensor network')
@@ -29,14 +28,15 @@ def main():
     parser.add_argument('--fitness-function', dest='fitness_function', required=True, type=int,
                         help='1 (sum square cc size)  or 3 (harmonic avg path length)')
     parser.add_argument('--output-base-dir', dest='output_dir', required=True,
-                        help='The output folder path. The GA process will write there files for visualization of optimized network')
+                        help='The GA process output folder path. (process visualization and result)')
     parser.add_argument('--initial-population', dest='initial_population', required=False, type=int, default=10,
                         help='The size of the initial population for the GA')
     parser.add_argument('--generations', dest='generations', required=False, type=int, default=300,
                         help='The number of generations for evolution.')
     parser.add_argument('--mutation-factor', dest='mutation_factor', required=False, type=float, default=1,
                         help='The probability of mutation')
-
+    parser.add_argument('--visualize', dest='visualize', required=False, type=str2bool, default=False,
+                        help='How many processes to spawn for parallel calculation')
     parser.add_argument('--parallel', dest='parallel', required=False, type=str2bool, default=False,
                         help='How many processes to spawn for parallel calculation')
 
@@ -50,7 +50,7 @@ def main():
     logger.info('creating initial population of size %s', args.initial_population)
     with timer(op_name='evolution', logger=logger):
         if not args.parallel:
-            logger.info("starting GA process synchronously")
+            logger.info("starting GA process (%s) synchronously", run_id)
             ga = GA(interest_areas=interest_areas, initial_population_size=args.initial_population,
                     generations=args.generations, fitness_function=fitness_function,
                     optimum=FitnessFunctions.get_fitness_function_optimum(args.fitness_function),
@@ -58,7 +58,7 @@ def main():
             ga.generate_initial_population()
             ga.evolve(logger=logger)
         else:
-            logger.info("starting GA process asynchronously")
+            logger.info("starting GA process (%s) asynchronously", run_id)
             from multiprocessing.pool import Pool
             with Pool() as pool:
                 ga = ParallelGA(interest_areas=interest_areas, initial_population_size=args.initial_population,
@@ -68,7 +68,7 @@ def main():
                 ga.generate_initial_population()
                 ga.evolve(logger=logger)
 
-    create_ga_process_visualization(ga=ga, output_dir=args.output_dir)
+    create_ga_process_files(ga=ga, output_dir=args.output_dir, visualize_ga=args.visualize)
     logger.info('Finished GA process')
 
 
@@ -80,14 +80,20 @@ def load_interest_areas(interest_areas_definition):
     return InterestAreaGenerator.from_file(interest_areas_definition)
 
 
-def create_ga_process_visualization(ga, output_dir):
-    logger.info('creating statistical data visualization')
-    Path('{}/{}/snapshots'.format(output_dir, ga.run_id)).mkdir(parents=True, exist_ok=True)
-    save_statistics(GAStatistics.GEN_FITNESS, ga.statistics.get(GAStatistics.GEN_FITNESS),
-                    path='{}/{}/{}.png'.format(output_dir, ga.run_id, GAStatistics.GEN_FITNESS))
+def create_ga_process_files(ga, output_dir, visualize_ga=False):
+    logger.info('creating ga process files')
+    Path('{}/{}'.format(output_dir, ga.run_id)).mkdir(parents=True, exist_ok=True)
+    fittest_network = ga.get_fittest().network
+    with open('{}/{}/network.json'.format(output_dir, ga.run_id), 'w+') as network_file:
+        network_file.write(json.dumps(fittest_network.as_json_dict(with_edges=True)))
+    if visualize_ga:
+        Path('{}/{}/snapshots'.format(output_dir, ga.run_id)).mkdir(parents=True, exist_ok=True)
+        logger.info("creating statistics visualization")
+        save_statistics(GAStatistics.GEN_FITNESS, ga.statistics.get(GAStatistics.GEN_FITNESS),
+                        path='{}/{}/{}.png'.format(output_dir, ga.run_id, GAStatistics.GEN_FITNESS))
 
-    logger.info('creating evolution visualization')
-    ga.generate_evolution_visualization(network_image_saver=save_network_image, output_dir=output_dir)
+        logger.info('creating ga visualization')
+        ga.generate_evolution_visualization(network_image_saver=save_network_image, output_dir=output_dir)
 
 
 if __name__ == '__main__':

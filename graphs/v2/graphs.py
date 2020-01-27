@@ -29,7 +29,7 @@ class Vertex(object):
     def __repr__(self):
         return "Vertex [id: " + str(self.id) + "]"
 
-    def as_json_dict(self):
+    def as_json_dict(self, *args, **kwargs):
         res = {
             'id': self.id,
             'location': self.get('location'),
@@ -245,11 +245,13 @@ class DiskGraph(Graph):
         for v in near_vertices:
             super(DiskGraph, self).add_edge(v1=v, v2=vertex)
 
-    def as_json_dict(self):
+    def as_json_dict(self, *args, **kwargs):
         res = {
             'radius': self.radius,
             'vertices': [v.as_json_dict() for v in self.vertices]
         }
+        if kwargs.get('with_edges', False):
+            res['edges'] = [(e.v1.id, e.v2.id) for e in self.edges]
         return res
 
     @classmethod

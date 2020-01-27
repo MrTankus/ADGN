@@ -1,7 +1,6 @@
 import datetime
 import hashlib
 import imageio
-import itertools
 import json
 import uuid
 import random
@@ -22,7 +21,7 @@ class Agent(object):
     def __lt__(self, other):
         return self.fitness > other.fitness
 
-    def as_json_dict(self):
+    def as_json_dict(self, *args, **kwargs):
         return {
             'agent_id': self.agent_id,
             'fitness': self.fitness,
@@ -147,20 +146,31 @@ class GA(object):
                     network.move_sensor(random_node)
 
     def add_relays(self):
-        for agent in self.agents:
+        relevant_agents = set(filter(lambda t: len(t[1]) > 0, map(lambda agent: (agent, agent.network.get_intersecting_connectivity_components()), self.agents)))
+        while len(relevant_agents) > 0:
+            agent, ccs = relevant_agents.pop()
+            ccs = set(ccs)
             network = agent.network
-            connectivity_components = set(network.graph.get_connectivity_components())
-            connectivity_component_pairs = set(itertools.combinations(connectivity_components, 2))
-            intersecting_connectivity_components = set(filter(lambda pair: network.get_connectivity_components_halos_intersections(cc1=pair[0], cc2=pair[1]), connectivity_component_pairs))
-            visited_components = set()
-            if intersecting_connectivity_components:
-                for cc1, cc2 in intersecting_connectivity_components:
-                    halo_intersecting_circles = network.get_connectivity_components_halos_intersections(cc1=cc1, cc2=cc2)
-                    intersecting_circles = random.choice(list(halo_intersecting_circles))
-                    _, relay_location = Circle.get_point_in_intersection(intersecting_circles)
-                    network.add_relay(location=relay_location)
-                    visited_components.add(cc1)
-                    visited_components.add(cc2)
+            cc1, cc2 = ccs.pop()
+            halo_intersecting_circles = network.get_connectivity_components_halos_intersections(cc1=cc1, cc2=cc2)
+            intersecting_circles = random.choice(list(halo_intersecting_circles))
+            _, relay_location = Circle.get_point_in_intersection(intersecting_circles)
+            network.add_relay(location=relay_location)
+            new_intersecting_connectivity_components = network.get_intersecting_connectivity_components()
+            if new_intersecting_connectivity_components:
+                relevant_agents.add((agent, new_intersecting_connectivity_components))
+
+
+        # for agent in self.agents:
+        #     network = agent.network
+        #     connectivity_component_pairs = set(itertools.combinations(network.graph.get_connectivity_components(), 2))
+        #     intersecting_connectivity_components = set(filter(lambda pair: network.get_connectivity_components_halos_intersections(cc1=pair[0], cc2=pair[1]), connectivity_component_pairs))
+        #     if intersecting_connectivity_components:
+        #         for cc1, cc2 in intersecting_connectivity_components:
+        #             halo_intersecting_circles = network.get_connectivity_components_halos_intersections(cc1=cc1, cc2=cc2)
+        #             intersecting_circles = random.choice(list(halo_intersecting_circles))
+        #             _, relay_location = Circle.get_point_in_intersection(intersecting_circles)
+        #             network.add_relay(location=relay_location)
 
     def get_fittest(self):
         from analysis.v2.fitness_functions import Optimum
@@ -196,10 +206,28 @@ class ParallelGA(GA):
                                          generations=generations, fitness_function=fitness_function, optimum=optimum,
                                          mutation_factor=mutation_factor, run_id=run_id)
         self.pool = pool
+        from ga.v2.parallel import breed_networks
+        self.parallel_breed = breed_networks
 
     def calc_fitness(self, *args, **kwargs):
-        for res in self.pool.map(self.fitness_function, [json.dumps(agent.as_json_dict()) for agent in self.agents]):
+        for res in self.pool.map(self.fitness_function, self.agents):
             agent = self.agent_mapping.get(res[0])
             if agent:
                 agent.fitness = res[1]
                 self.fittest_agent = agent if self.fittest_agent is None or self.fittest_agent.fitness < agent.fitness else self.fittest_agent
+
+    def breed(self, *args, **kwargs):
+        all_agents = list(self.agents)
+        breeding_info = list()
+        while len(all_agents) > 1:
+            a1 = random.choice(all_agents)
+            all_agents.remove(a1)
+            a2 = random.choice(all_agents)
+            all_agents.remove(a2)
+            breeding_info.append((a1.network, a2.network, self.interest_areas))
+
+        offsprings = list()
+        for res in self.pool.starmap(self.parallel_breed, breeding_info):
+            offsprings.append(Agent(network=res[0]))
+            offsprings.append(Agent(network=res[1]))
+        self.agents.extend(offsprings)
