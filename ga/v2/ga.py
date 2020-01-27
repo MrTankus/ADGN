@@ -160,18 +160,6 @@ class GA(object):
             if new_intersecting_connectivity_components:
                 relevant_agents.add((agent, new_intersecting_connectivity_components))
 
-
-        # for agent in self.agents:
-        #     network = agent.network
-        #     connectivity_component_pairs = set(itertools.combinations(network.graph.get_connectivity_components(), 2))
-        #     intersecting_connectivity_components = set(filter(lambda pair: network.get_connectivity_components_halos_intersections(cc1=pair[0], cc2=pair[1]), connectivity_component_pairs))
-        #     if intersecting_connectivity_components:
-        #         for cc1, cc2 in intersecting_connectivity_components:
-        #             halo_intersecting_circles = network.get_connectivity_components_halos_intersections(cc1=cc1, cc2=cc2)
-        #             intersecting_circles = random.choice(list(halo_intersecting_circles))
-        #             _, relay_location = Circle.get_point_in_intersection(intersecting_circles)
-        #             network.add_relay(location=relay_location)
-
     def get_fittest(self):
         from analysis.v2.fitness_functions import Optimum
         fittest = None

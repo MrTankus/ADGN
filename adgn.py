@@ -21,6 +21,7 @@ logger = logging.getLogger('AGDN')
 logger.setLevel(logging.INFO)
 logger.addHandler(handler)
 
+
 def main():
     parser = argparse.ArgumentParser(description='Create an optimized adhoc sensor network')
     parser.add_argument('--interest-areas', dest='interest_areas', required=True,
@@ -86,6 +87,12 @@ def create_ga_process_files(ga, output_dir, visualize_ga=False):
     fittest_network = ga.get_fittest().network
     with open('{}/{}/network.json'.format(output_dir, ga.run_id), 'w+') as network_file:
         network_file.write(json.dumps(fittest_network.as_json_dict(with_edges=True)))
+    with open('{}/{}/network.info'.format(output_dir, ga.run_id), 'w+') as network_info_file:
+        network_info = {
+            'connectivity_components_amount': len(fittest_network.graph.get_connectivity_components()),
+            'size_of_largest_component': max([len(cc) for cc in fittest_network.graph.get_connectivity_components()]),
+        }
+        network_info_file.write(json.dumps(network_info))
     if visualize_ga:
         Path('{}/{}/snapshots'.format(output_dir, ga.run_id)).mkdir(parents=True, exist_ok=True)
         logger.info("creating statistics visualization")
