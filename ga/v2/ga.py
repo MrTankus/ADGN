@@ -42,7 +42,6 @@ class GA(object):
         self.initial_population_size = initial_population_size
         self.fitness_function = fitness_function
         self.agents = None
-        self.agent_mapping = dict()
         self.generations = generations
         self.mutation_factor = mutation_factor
         self.statistics = GAStatistics(ga=self)
@@ -67,7 +66,6 @@ class GA(object):
             agent = Agent(network=network)
             _, agent.fitness = self.fitness_function(agent=agent)
             initial_agents.append(agent)
-            self.agent_mapping[agent.agent_id] = agent
         self.agents = initial_agents
 
     def evolve(self, logger):
@@ -108,7 +106,6 @@ class GA(object):
         from analysis.v2.fitness_functions import Optimum
         selected_agents = sorted(self.agents, key=lambda agent: agent.fitness, reverse=self.optimum == Optimum.MAX)
         self.agents = selected_agents[:self.initial_population_size]
-        self.agent_mapping = dict(map(lambda agent: (agent.agent_id, agent), self.agents))
 
     def breed(self, *args, **kwargs):
         all_agents = list(self.agents)
@@ -195,13 +192,21 @@ class ParallelGA(GA):
         self.pool = pool
         from ga.v2.parallel import breed_networks
         self.parallel_breed = breed_networks
+        self.agent_mapping = dict()
+
+    def generate_initial_population(self):
+        super(ParallelGA, self).generate_initial_population()
+        self.agent_mapping = dict(map(lambda agent: (agent.agent_id, agent), self.agents))
+
+    def selection(self, *args, **kwargs):
+        super(ParallelGA, self).selection(*args, **kwargs)
+        self.agent_mapping = dict(map(lambda agent: (agent.agent_id, agent), self.agents))
 
     def calc_fitness(self, *args, **kwargs):
         for res in self.pool.map(self.fitness_function, self.agents):
-            agent = self.agent_mapping.get(res[0])
-            if agent:
-                agent.fitness = res[1]
-                self.fittest_agent = agent if self.fittest_agent is None or self.fittest_agent.fitness < agent.fitness else self.fittest_agent
+            agent = self.agent_mapping[res[0]]
+            agent.fitness = res[1]
+            self.fittest_agent = agent if self.fittest_agent is None or self.fittest_agent.fitness < agent.fitness else self.fittest_agent
 
     def breed(self, *args, **kwargs):
         all_agents = list(self.agents)
@@ -215,6 +220,10 @@ class ParallelGA(GA):
 
         offsprings = list()
         for res in self.pool.starmap(self.parallel_breed, breeding_info):
-            offsprings.append(Agent(network=res[0]))
-            offsprings.append(Agent(network=res[1]))
+            agent1 = Agent(network=res[0])
+            agent2 = Agent(network=res[1])
+            self.agent_mapping[agent1.agent_id] = agent1
+            self.agent_mapping[agent2.agent_id] = agent2
+            offsprings.append(agent1)
+            offsprings.append(agent2)
         self.agents.extend(offsprings)
