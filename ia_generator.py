@@ -1,8 +1,8 @@
 import argparse
 import json
 
-from network.v2.interest_areas import InterestAreaGenerator
-from utils.v2.utils import plot_interest_areas, str2bool
+from network.interest_areas import InterestAreaGenerator
+from utils.utils import plot_interest_areas, str2bool
 
 
 def main():

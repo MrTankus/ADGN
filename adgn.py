@@ -8,11 +8,11 @@ from pathlib import Path
 import uuid
 from sys import stdout
 
-from analysis.v2.fitness_functions import FitnessFunctions
-from ga.v2.ga import GA, ParallelGA
-from ga.v2.statistics import GAStatistics
-from network.v2.interest_areas import InterestAreaGenerator
-from utils.v2.utils import timer, save_statistics, save_network_image, str2bool
+from analysis.fitness_functions import FitnessFunctions
+from ga.ga import GA, ParallelGA
+from ga.statistics import GAStatistics
+from network.interest_areas import InterestAreaGenerator
+from utils.utils import timer, save_statistics, save_network_image, str2bool
 
 formatter = logging.Formatter('%(asctime)s %(levelname)s: %(message)s')
 handler = logging.StreamHandler(stdout)

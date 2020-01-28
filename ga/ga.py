@@ -5,10 +5,10 @@ import json
 import uuid
 import random
 
-from ga.v2.statistics import GAStatistics
+from ga.statistics import GAStatistics
 from geometry.shapes import Circle
-from network.v2.network import ADGN
-from utils.v2.utils import timer
+from network.network import ADGN
+from utils.utils import timer
 
 
 class Agent(object):
@@ -103,7 +103,7 @@ class GA(object):
             self.fittest_agent = agent if self.fittest_agent is None or self.fittest_agent.fitness < agent.fitness else self.fittest_agent
 
     def selection(self, *args, **kwargs):
-        from analysis.v2.fitness_functions import Optimum
+        from analysis.fitness_functions import Optimum
         selected_agents = sorted(self.agents, key=lambda agent: agent.fitness, reverse=self.optimum == Optimum.MAX)
         self.agents = selected_agents[:self.initial_population_size]
 
@@ -157,7 +157,7 @@ class GA(object):
                 relevant_agents.add((agent, new_intersecting_connectivity_components))
 
     def get_fittest(self):
-        from analysis.v2.fitness_functions import Optimum
+        from analysis.fitness_functions import Optimum
         fittest = None
         for agent in self.agents:
             if fittest is None:
@@ -190,7 +190,7 @@ class ParallelGA(GA):
                                          generations=generations, fitness_function=fitness_function, optimum=optimum,
                                          mutation_factor=mutation_factor, run_id=run_id)
         self.pool = pool
-        from ga.v2.parallel import breed_networks
+        from ga.parallel import breed_networks
         self.parallel_breed = breed_networks
         self.agent_mapping = dict()
 

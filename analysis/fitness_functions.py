@@ -1,6 +1,6 @@
 import itertools
 
-from ga.v2.ga import Agent
+from ga.ga import Agent
 
 
 def sum_square_connectivity_componenet_fitness_function(agent):

@@ -5,8 +5,8 @@ import uuid
 import random
 
 from geometry.shapes import Circle
-from graphs.v2.graphs import Vertex, DiskGraph
-from network.v2.interest_areas import InterestArea
+from graphs.graphs import Vertex, DiskGraph
+from network.interest_areas import InterestArea
 
 
 class ADGN(object):

@@ -1,6 +1,6 @@
 import random
 
-from network.v2.network import ADGN
+from network.network import ADGN
 
 
 def breed_networks(n1, n2, interest_areas):
