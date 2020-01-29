@@ -30,5 +30,24 @@ The following command will run the GA<br/>
 <i>python adgn.py --interest-areas=ia.json --fitness-function=3 --output-base-dir=/tmp/simulations --parallel=true --visualize=true</i>
 
 
+<br/>
+<h3>Generating random Interest Areas</h3>
+To generate a interest areas json file with random interest areas, please use the following command<br/>
+<i>python ia_generator.py --amount=170 --xlim=8 --ylim=8 --output=/tmp/interest_areas.json</i> 
+<h4>Parameters</h4>
+<ul>
+<li><b><i>--amount</i></b> (required): the amount of interest areas to generate</li>
+<li><b><i>--xlim</i></b> (required): the absolute value of the limit of the x axis on the [xy] plane</li>
+<li><b><i>--ylim</i></b> (required): the absolute value of the limit of the y axis on the [xy] plane</li>
+<li><b><i>--output</i></b> (required): the file name (with path) to output the generated interest areas json file</li>
+<li><b><i>--allow-overlap</i></b> (optional. default false): can the interest areas overlap</li>
+<li><b><i>--show</i></b> (optional. default true): if set to true, at the end of the process, will show the generated interst areas on the [xy] plane</li>
+</ul> 
+The interest areas will be generated in the rectangle [-xlim, xlim] X [-ylim, ylim]
+
+<h4>Known issues</h4>
+if the <i>--allow-overlap</i> is set to false, the interest areas random generator may result in an infinite loop. to
+avoid this, please set the <i>--xlim</i> and <i>--ylim</i> parameters to large enough values.
+
 <h3>Logging</h3>
-The GA process will output the log to the stdout. 
+Every log will output to the stdout.
