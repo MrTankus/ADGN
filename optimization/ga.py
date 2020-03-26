@@ -5,7 +5,7 @@ import json
 import uuid
 import random
 
-from ga.statistics import GAStatistics
+from optimization.statistics import GAStatistics
 from geometry.shapes import Circle
 from network.network import ADGN
 from utils.utils import timer
@@ -190,7 +190,7 @@ class ParallelGA(GA):
                                          generations=generations, fitness_function=fitness_function, optimum=optimum,
                                          mutation_factor=mutation_factor, run_id=run_id)
         self.pool = pool
-        from ga.parallel import breed_networks
+        from optimization.parallel import breed_networks
         self.parallel_breed = breed_networks
         self.agent_mapping = dict()
 

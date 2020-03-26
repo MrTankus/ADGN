@@ -1,4 +1,6 @@
+import hashlib
 import itertools
+import uuid
 from collections import deque
 
 import numpy as np
@@ -8,7 +10,7 @@ from geometry.metrics import euclidean_metric
 class Vertex(object):
 
     def __init__(self, vertex_id, **kwargs):
-        self.id = vertex_id
+        self.id = vertex_id if vertex_id is not None else hashlib.sha256(str(uuid.uuid4()).encode()).hexdigest()
         self.metadata = kwargs or dict()
 
     def get(self, key, default=None):
@@ -83,8 +85,6 @@ class Graph(object):
         self.edges = edges or set()
         self.directed = directed
 
-        self.is_sparse = ((len(self.vertices) * (len(self.vertices) - 1) / 2) - len(self.edges)) / len(self.vertices) > 0.5 if self.vertices else False
-
         self.vertices_indices_map = dict(zip(self.vertices, range(len(self.vertices))))
         self.adj = self.get_adjacency_matrix()
 
@@ -137,6 +137,7 @@ class Graph(object):
             if not self.directed:
                 adj[self.vertices_indices_map.get(edge.v2), self.vertices_indices_map.get(edge.v1)] = edge.weight
             adj[self.vertices_indices_map.get(edge.v1), self.vertices_indices_map.get(edge.v2)] = edge.weight
+        # adj[np.where(adj == 0)] = np.inf
         return adj
 
     def calculate_paths(self):

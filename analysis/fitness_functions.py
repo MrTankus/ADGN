@@ -1,6 +1,6 @@
 import itertools
 
-from ga.ga import Agent
+from optimization.ga import Agent
 
 
 def sum_square_connectivity_componenet_fitness_function(agent):
@@ -22,7 +22,7 @@ def harmonic_avg_on_paths_length_fitness_function(agent):
     distance_sum = list()
     ccs = network.graph.get_connectivity_components()
     if len(ccs) == n:
-        return 0
+        return agent_id, 0
 
     for cc in filter(lambda cc: len(cc) > 1, ccs):
         sensors = filter(lambda vertex: not vertex.get('is_relay'), cc)

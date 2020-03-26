@@ -41,6 +41,13 @@ class ADGN(object):
         y_location = interest_area.center[1] + r * math.sin(argument)
         return x_location, y_location
 
+    @classmethod
+    def is_valid_location(cls, vertex, location):
+        ia = vertex.get('interest_area')
+        if ia:
+            return ia.is_in_circle(location)
+        return True
+
     def randomize(self):
         sensor_id = 0
         for interest_area in self.interest_areas:
